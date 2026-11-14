@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CarLog">
-    <link id="dynamicManifest" rel="manifest">
-    <link id="appleTouchIcon" rel="apple-touch-icon">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
     <title>CarLog - 愛車メンテナンス記録</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1302,23 +1304,10 @@ function doPost(e) {
         });
 
         function setupPwaAssets() {
-            const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0f172a"/><circle cx="256" cy="256" r="180" fill="#2563eb"/><path d="M144 280l28-76c8-20 26-32 48-32h72c22 0 40 12 48 32l28 76v64c0 12-10 22-22 22h-16c-12 0-22-10-22-22v-16H204v16c0 12-10 22-22 22h-16c-12 0-22-10-22-22v-64zm52-16a20 20 0 1 0 0-40 20 20 0 0 0 0 40zm120 0a20 20 0 1 0 0-40 20 20 0 0 0 0 40z" fill="#ffffff"/></svg>`;
-            const iconUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgIcon);
-            const appleIcon = document.getElementById('appleTouchIcon');
-            if (appleIcon) appleIcon.href = iconUrl;
-
-            const manifest = {
-                name: 'CarLog - 愛車メンテナンス記録',
-                short_name: 'CarLog',
-                start_url: '.',
-                display: 'standalone',
-                background_color: '#f1f5f9',
-                theme_color: '#0f172a',
-                icons: [{ src: iconUrl, sizes: '512x512', type: 'image/svg+xml' }]
-            };
-            const manifestEl = document.getElementById('dynamicManifest');
-            if (manifestEl) {
-                manifestEl.href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').catch((err) => {
+                    console.warn('Service Worker registration failed:', err);
+                });
             }
 
             window.addEventListener('beforeinstallprompt', (e) => {
