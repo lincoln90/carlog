@@ -138,7 +138,7 @@
                         <span class="text-xs font-semibold text-slate-500">前回のオイル交換</span>
                         <span id="oilDaysAgo" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">記録なし</span>
                     </div>
-                    <p id="lastOilDate" class="text-lg font-bold text-slate-800 mt-1">----/--/--</p>
+                    <p id="lastOilDate" class="text-lg font-bold text-slate-800 mt-1">----年--月--日</p>
                     <p id="nextOilSchedule" class="text-[11px] font-semibold text-amber-700 mt-0.5 hidden"></p>
                     <p id="lastOilDetail" class="text-xs text-slate-500 truncate mt-0.5">まだ記録がありません</p>
                 </div>
@@ -154,7 +154,7 @@
                         <span class="text-xs font-semibold text-slate-500">前回のタイヤ交換</span>
                         <span id="tireDaysAgo" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">記録なし</span>
                     </div>
-                    <p id="lastTireDate" class="text-lg font-bold text-slate-800 mt-1">----/--/--</p>
+                    <p id="lastTireDate" class="text-lg font-bold text-slate-800 mt-1">----年--月--日</p>
                     <p id="lastTireDetail" class="text-xs text-slate-500 truncate mt-0.5">まだ記録がありません</p>
                 </div>
             </div>
@@ -796,6 +796,14 @@ function formatDateCell(val) {
   return String(val);
 }
 
+function formatMonthCell(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM');
+  }
+  return String(val);
+}
+
 function hasIdInSheet(sheet, id) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return false;
@@ -839,7 +847,7 @@ function doGet(e) {
       plate: String(row[3] || ''),
       model: String(row[4] || ''),
       chassis: String(row[5] || ''),
-      firstReg: String(row[6] || ''),
+      firstReg: formatMonthCell(row[6]),
       memo: String(row[7] || ''),
       carId: String(row[9] || 'default-car'),
       carName: String(row[10] || '')
@@ -877,7 +885,7 @@ function doGet(e) {
       plate: String(row[2] || ''),
       model: String(row[3] || ''),
       chassis: String(row[4] || ''),
-      firstReg: String(row[5] || '')
+      firstReg: formatMonthCell(row[5])
     });
   }
 
@@ -1172,6 +1180,62 @@ function doPost(e) {
             ]);
         }
 
+        function normalizeDateStr(val) {
+            if (!val) return '';
+            const str = String(val).trim();
+            const ymd = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+            if (ymd) {
+                return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
+            }
+            const parsed = new Date(str);
+            if (!isNaN(parsed.getTime())) {
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+            return str;
+        }
+
+        function normalizeMonthStr(val) {
+            if (!val) return '';
+            const str = String(val).trim();
+            const ym = str.match(/^(\d{4})[-/](\d{1,2})(?:[-/]\d{1,2})?$/);
+            if (ym) {
+                return `${ym[1]}-${ym[2].padStart(2, '0')}`;
+            }
+            const ymd = normalizeDateStr(str);
+            const m = ymd.match(/^(\d{4})-(\d{2})-\d{2}$/);
+            if (m) return `${m[1]}-${m[2]}`;
+            return str;
+        }
+
+        function formatDateJP(val) {
+            const norm = normalizeDateStr(val);
+            const m = norm.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (m) return `${Number(m[1])}年${Number(m[2])}月${Number(m[3])}日`;
+            return norm || '----年--月--日';
+        }
+
+        function formatMonthJP(val) {
+            const norm = normalizeMonthStr(val);
+            const m = norm.match(/^(\d{4})-(\d{2})$/);
+            if (m) return `${Number(m[1])}年${Number(m[2])}月`;
+            return norm || '-';
+        }
+
+        function normalizeAllDates() {
+            records.forEach(r => { if (r) r.date = normalizeDateStr(r.date); });
+            shakenRecords.forEach(s => {
+                if (!s) return;
+                s.issueDate = normalizeDateStr(s.issueDate);
+                s.expiryDate = normalizeDateStr(s.expiryDate);
+                s.firstReg = normalizeMonthStr(s.firstReg);
+            });
+            fuelRecords.forEach(f => { if (f) f.date = normalizeDateStr(f.date); });
+            carsMaster.forEach(c => { if (c) c.firstReg = normalizeMonthStr(c.firstReg); });
+        }
+
         async function loadAllLocalData() {
             const [r, s, f, c, q] = await Promise.all([
                 dbGet('records', STORAGE_KEY_RECORDS),
@@ -1185,6 +1249,7 @@ function doPost(e) {
             fuelRecords = Array.isArray(f) ? f : [];
             carsMaster = Array.isArray(c) ? c : [];
             syncQueue = Array.isArray(q) ? q : [];
+            normalizeAllDates();
         }
 
         // ==========================================
@@ -1485,6 +1550,7 @@ function doPost(e) {
                         shakenRecords = Array.isArray(data.shakenRecords) ? data.shakenRecords : [];
                         fuelRecords = Array.isArray(data.fuelRecords) ? data.fuelRecords : [];
                         carsMaster = Array.isArray(data.cars) ? data.cars : [];
+                        normalizeAllDates();
 
                         await persistAllLocalData();
                         sortRecords();
@@ -1673,8 +1739,9 @@ function doPost(e) {
             const alertBanner = document.getElementById('oilAlertBanner');
 
             if (lastOil) {
-                lastOilDateEl.textContent = lastOil.date;
-                const diffDays = calcDaysDiffFromToday(lastOil.date);
+                const lastOilNorm = normalizeDateStr(lastOil.date);
+                lastOilDateEl.textContent = formatDateJP(lastOilNorm);
+                const diffDays = calcDaysDiffFromToday(lastOilNorm);
                 oilDaysAgoEl.textContent = diffDays === 0 ? '今日' : `${diffDays}日前`;
 
                 const details = [];
@@ -1684,17 +1751,18 @@ function doPost(e) {
                 lastOilDetailEl.textContent = details.length > 0 ? details.join(' / ') : '詳細メモなし';
 
                 // 次回交換目安（1ヶ月前アラート判定）
-                const nextDate = new Date(lastOil.date + 'T00:00:00');
+                const nextDate = new Date(lastOilNorm + 'T00:00:00');
                 nextDate.setDate(nextDate.getDate() + oilCycleDays);
-                const nextDateStr = nextDate.toISOString().split('T')[0];
+                const nextDateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
+                const nextDateLabel = formatDateJP(nextDateStr);
                 const daysUntilNext = -calcDaysDiffFromToday(nextDateStr);
 
                 nextOilScheduleEl.classList.remove('hidden');
                 if (daysUntilNext < 0) {
-                    nextOilScheduleEl.textContent = `交換目安(${nextDateStr})を${Math.abs(daysUntilNext)}日超過`;
+                    nextOilScheduleEl.textContent = `交換目安(${nextDateLabel})を${Math.abs(daysUntilNext)}日超過`;
                     nextOilScheduleEl.className = 'text-[11px] font-bold text-rose-600 mt-0.5';
                 } else {
-                    nextOilScheduleEl.textContent = `次回目安: ${nextDateStr}（あと${daysUntilNext}日）`;
+                    nextOilScheduleEl.textContent = `次回目安: ${nextDateLabel}（あと${daysUntilNext}日）`;
                     nextOilScheduleEl.className = 'text-[11px] font-semibold text-amber-700 mt-0.5';
                 }
 
@@ -1703,13 +1771,13 @@ function doPost(e) {
                     document.getElementById('oilAlertTitle').textContent =
                         daysUntilNext < 0 ? 'オイル交換の推奨時期を過ぎています！' : 'オイル交換の時期（1ヶ月前）が近づいています';
                     document.getElementById('oilAlertDesc').textContent =
-                        `前回交換日（${lastOil.date}）から${oilCycleDays}日サイクルでの次回目安は ${nextDateStr}（${daysUntilNext < 0 ? Math.abs(daysUntilNext) + '日超過' : 'あと' + daysUntilNext + '日'}）です。`;
-                    triggerOilReminderNotification(nextDateStr, daysUntilNext);
+                        `前回交換日（${formatDateJP(lastOilNorm)}）から${oilCycleDays}日サイクルでの次回目安は ${nextDateLabel}（${daysUntilNext < 0 ? Math.abs(daysUntilNext) + '日超過' : 'あと' + daysUntilNext + '日'}）です。`;
+                    triggerOilReminderNotification(nextDateLabel, daysUntilNext);
                 } else if (alertBanner) {
                     alertBanner.classList.add('hidden');
                 }
             } else {
-                lastOilDateEl.textContent = '----/--/--';
+                lastOilDateEl.textContent = '----年--月--日';
                 oilDaysAgoEl.textContent = '記録なし';
                 nextOilScheduleEl.classList.add('hidden');
                 lastOilDetailEl.textContent = 'まだ記録がありません';
@@ -1723,7 +1791,7 @@ function doPost(e) {
             const lastTireDetailEl = document.getElementById('lastTireDetail');
 
             if (lastTire) {
-                lastTireDateEl.textContent = lastTire.date;
+                lastTireDateEl.textContent = formatDateJP(lastTire.date);
                 const diffDays = calcDaysDiffFromToday(lastTire.date);
                 tireDaysAgoEl.textContent = diffDays === 0 ? '今日' : `${diffDays}日前`;
                 const details = [];
@@ -1732,7 +1800,7 @@ function doPost(e) {
                 if (selectedCarId === 'ALL' && lastTire.carName) details.unshift(`[${lastTire.carName}]`);
                 lastTireDetailEl.textContent = details.length > 0 ? details.join(' / ') : '詳細メモなし';
             } else {
-                lastTireDateEl.textContent = '----/--/--';
+                lastTireDateEl.textContent = '----年--月--日';
                 tireDaysAgoEl.textContent = '記録なし';
                 lastTireDetailEl.textContent = 'まだ記録がありません';
             }
@@ -1745,7 +1813,7 @@ function doPost(e) {
             document.getElementById('latestShakenCarName').textContent = activeCar.name || 'マイカー1号';
             document.getElementById('latestShakenPlate').textContent = activeCar.plate || (latest && latest.plate) || '未登録';
             document.getElementById('latestShakenModel').textContent = activeCar.model || (latest && latest.model) || '-';
-            document.getElementById('latestShakenFirstReg').textContent = activeCar.firstReg || (latest && latest.firstReg) || '-';
+            document.getElementById('latestShakenFirstReg').textContent = formatMonthJP(activeCar.firstReg || (latest && latest.firstReg));
             document.getElementById('latestShakenChassis').textContent = activeCar.chassis || (latest && latest.chassis) || '-';
 
             document.getElementById('shakenHistoryCount').textContent = String(carShakenList.length);
@@ -1758,9 +1826,9 @@ function doPost(e) {
                 emptyState.classList.add('hidden');
                 latestCard.classList.remove('hidden');
 
-                document.getElementById('latestShakenExpiry').textContent = latest.expiryDate || '----/--/--';
+                document.getElementById('latestShakenExpiry').textContent = formatDateJP(latest.expiryDate);
                 document.getElementById('latestShakenMemo').textContent = `メモ: ${latest.memo || 'なし'}`;
-                document.getElementById('latestShakenUpdated').textContent = `交付日: ${latest.issueDate || '----/--/--'}`;
+                document.getElementById('latestShakenUpdated').textContent = `交付日: ${formatDateJP(latest.issueDate)}`;
 
                 const countdownEl = document.getElementById('latestShakenCountdown');
                 const daysLeft = -calcDaysDiffFromToday(latest.expiryDate);
@@ -1782,8 +1850,10 @@ function doPost(e) {
         }
 
         function calcDaysDiffFromToday(dateStr) {
-            if (!dateStr) return 0;
-            const target = new Date(dateStr + 'T00:00:00');
+            const norm = normalizeDateStr(dateStr);
+            if (!norm) return 0;
+            const target = new Date(norm + 'T00:00:00');
+            if (isNaN(target.getTime())) return 0;
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             return Math.floor((today - target) / (1000 * 60 * 60 * 24));
@@ -1949,10 +2019,13 @@ function doPost(e) {
             if (existing) {
                 titleEl.textContent = '車検証を更新する（2年更新）';
                 carryOverNotice.classList.remove('hidden');
-                if (existing.expiryDate) {
-                    const prevExp = new Date(existing.expiryDate + 'T00:00:00');
-                    prevExp.setFullYear(prevExp.getFullYear() + 2);
-                    document.getElementById('shakenExpiryDate').value = prevExp.toISOString().split('T')[0];
+                const prevNorm = normalizeDateStr(existing.expiryDate);
+                if (prevNorm) {
+                    const prevExp = new Date(prevNorm + 'T00:00:00');
+                    if (!isNaN(prevExp.getTime())) {
+                        prevExp.setFullYear(prevExp.getFullYear() + 2);
+                        document.getElementById('shakenExpiryDate').value = `${prevExp.getFullYear()}-${String(prevExp.getMonth() + 1).padStart(2, '0')}-${String(prevExp.getDate()).padStart(2, '0')}`;
+                    }
                 }
             } else {
                 titleEl.textContent = '車検証情報を登録する';
@@ -2053,7 +2126,7 @@ function doPost(e) {
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-2">
                                 ${idx === 0 ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-600 text-white">最新</span>' : '<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-600">過去履歴</span>'}
-                                <span class="font-bold text-slate-800 text-xs">満了日: ${escapeHtml(item.expiryDate)}</span>
+                                <span class="font-bold text-slate-800 text-xs">満了日: ${escapeHtml(formatDateJP(item.expiryDate))}</span>
                             </div>
                             <button type="button" onclick="requestDeleteShaken('${escapeHtml(item.id)}')" class="text-slate-400 hover:text-rose-600 p-1 text-xs" title="削除">
                                 <i class="fa-solid fa-trash-can"></i>
@@ -2061,7 +2134,7 @@ function doPost(e) {
                         </div>
                         <div class="text-xs text-slate-700 font-semibold">${escapeHtml(item.plate)} ${item.model ? `/ ${escapeHtml(item.model)}` : ''}</div>
                         <div class="text-[11px] text-slate-500 flex flex-wrap gap-x-3">
-                            <span>交付日: ${escapeHtml(item.issueDate)}</span>
+                            <span>交付日: ${escapeHtml(formatDateJP(item.issueDate))}</span>
                             ${item.chassis ? `<span>車台番号: ${escapeHtml(item.chassis)}</span>` : ''}
                         </div>
                         ${item.memo ? `<p class="text-[11px] text-slate-500">${escapeHtml(item.memo)}</p>` : ''}
@@ -2425,7 +2498,7 @@ function doPost(e) {
                     <div class="bg-slate-50 rounded-xl p-3 border border-slate-200/80 flex items-center justify-between gap-2.5">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center flex-wrap gap-1.5">
-                                <span class="text-xs font-bold text-slate-800">${escapeHtml(item.date)}</span>
+                                <span class="text-xs font-bold text-slate-800">${escapeHtml(formatDateJP(item.date))}</span>
                                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">${escapeHtml(item.category)}</span>
                                 ${eff ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800"><i class="fa-solid fa-leaf mr-0.5"></i>${eff.kmPerL} km/L (+${eff.tripKm.toLocaleString()}km${eff.yenPerKm ? ` / ${eff.yenPerKm}円/km` : ''})</span>` : (isFirstMileage ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-600">基準距離（次回給油で燃費計算）</span>` : '')}
                                 ${selectedCarId === 'ALL' && item.carName ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600">${escapeHtml(item.carName)}</span>` : ''}
@@ -2502,7 +2575,7 @@ function doPost(e) {
                             </div>
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center flex-wrap gap-1.5">
-                                    <span class="text-xs font-bold text-slate-800">${escapeHtml(item.date)}</span>
+                                    <span class="text-xs font-bold text-slate-800">${escapeHtml(formatDateJP(item.date))}</span>
                                     <span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${style.bg} ${style.text}">${escapeHtml(item.category)}</span>
                                     ${selectedCarId === 'ALL' && item.carName ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">${escapeHtml(item.carName)}</span>` : ''}
                                 </div>
