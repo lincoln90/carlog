@@ -1303,16 +1303,10 @@ function doPost(e) {
             loadRecords(false);
         });
 
-        function setupPwaAssets() {
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('./sw.js').catch((err) => {
-                    console.warn('Service Worker registration failed:', err);
-                });
-            }
-
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredInstallPrompt = e;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            const showInstallButtons = () => {
                 const hdrBtn = document.getElementById('pwaInstallBtn');
                 const modalBtn = document.getElementById('modalPwaBtn');
                 if (hdrBtn) {
@@ -1320,7 +1314,20 @@ function doPost(e) {
                     hdrBtn.classList.add('flex');
                 }
                 if (modalBtn) modalBtn.classList.remove('hidden');
-            });
+            };
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', showInstallButtons, { once: true });
+            } else {
+                showInstallButtons();
+            }
+        });
+
+        function setupPwaAssets() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').catch((err) => {
+                    console.warn('Service Worker registration failed:', err);
+                });
+            }
         }
 
         async function triggerPwaInstall() {
