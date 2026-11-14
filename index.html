@@ -1,0 +1,2614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CarLog">
+    <link id="dynamicManifest" rel="manifest">
+    <link id="appleTouchIcon" rel="apple-touch-icon">
+    <title>CarLog - 愛車メンテナンス記録</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+            -webkit-tap-highlight-color: transparent;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .fade-in {
+            animation: fadeIn 0.25s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- ヘッダー -->
+    <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md">
+        <div class="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-inner">
+                    <i class="fa-solid fa-car-side text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight leading-none">CarLog</h1>
+                    <p class="text-[11px] text-slate-400 mt-0.5">メンテナンス記録帳</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <!-- PWAインストールボタン（対応環境で表示） -->
+                <button type="button" onclick="triggerPwaInstall()" id="pwaInstallBtn" class="hidden items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-xs transition">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <span class="hidden sm:inline">アプリ化</span>
+                </button>
+                <!-- 手動同期ボタン（GAS連携時に表示） -->
+                <button type="button" onclick="triggerManualSync()" id="manualSyncBtn" title="今すぐスプレッドシートと同期" class="hidden items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+                    <i id="syncSpinIcon" class="fa-solid fa-cloud-arrow-up"></i>
+                    <span id="pendingSyncBadge" class="hidden px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-bold text-[10px]">0</span>
+                </button>
+                <!-- 接続・同期ステータスバッジ -->
+                <button type="button" onclick="openSettingsModal()" id="connectionBadge" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
+                    <span id="statusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span id="statusText">ローカル保存モード</span>
+                    <i class="fa-solid fa-gear text-slate-400 ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 max-w-3xl w-full mx-auto px-4 py-6 space-y-6">
+
+        <!-- 車両切り替えバー（複数台対応） -->
+        <section class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200/80 flex items-center justify-between gap-2">
+            <div id="carTabsContainer" class="flex items-center space-x-1.5 overflow-x-auto pb-0.5 flex-1">
+                <!-- JSで車両タブを動的描画 -->
+            </div>
+            <div class="flex items-center space-x-1.5 shrink-0">
+                <button type="button" id="deleteCarBtn" onclick="requestDeleteCar()" title="選択中の車を削除" class="hidden px-2.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs transition items-center space-x-1">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span class="hidden sm:inline">削除</span>
+                </button>
+                <button type="button" onclick="openAddCarModal()" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition flex items-center space-x-1 shadow-xs">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>車を追加</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- オイル交換1ヶ月前リマインダー警告バナー -->
+        <section id="oilAlertBanner" class="hidden bg-amber-50 border-l-4 border-amber-500 rounded-2xl p-4 shadow-sm flex items-start justify-between gap-3 fade-in">
+            <div class="flex items-start space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <i class="fa-solid fa-bell text-base"></i>
+                </div>
+                <div>
+                    <h3 id="oilAlertTitle" class="text-sm font-bold text-amber-900">オイル交換の時期が近づいています</h3>
+                    <p id="oilAlertDesc" class="text-xs text-amber-800 mt-0.5 leading-relaxed"></p>
+                </div>
+            </div>
+            <button type="button" onclick="document.getElementById('oilAlertBanner').classList.add('hidden')" class="text-amber-500 hover:text-amber-700 p-1">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </section>
+
+        <!-- サマリーカード（前回のオイル交換・タイヤ交換） -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- オイル交換サマリー -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex items-start space-x-3.5">
+                <div class="w-11 h-11 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <i class="fa-solid fa-oil-can text-xl"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500">前回のオイル交換</span>
+                        <span id="oilDaysAgo" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">記録なし</span>
+                    </div>
+                    <p id="lastOilDate" class="text-lg font-bold text-slate-800 mt-1">----/--/--</p>
+                    <p id="nextOilSchedule" class="text-[11px] font-semibold text-amber-700 mt-0.5 hidden"></p>
+                    <p id="lastOilDetail" class="text-xs text-slate-500 truncate mt-0.5">まだ記録がありません</p>
+                </div>
+            </div>
+
+            <!-- タイヤ交換サマリー -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex items-start space-x-3.5">
+                <div class="w-11 h-11 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <i class="fa-solid fa-dharmachakra text-xl"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500">前回のタイヤ交換</span>
+                        <span id="tireDaysAgo" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">記録なし</span>
+                    </div>
+                    <p id="lastTireDate" class="text-lg font-bold text-slate-800 mt-1">----/--/--</p>
+                    <p id="lastTireDetail" class="text-xs text-slate-500 truncate mt-0.5">まだ記録がありません</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 車検証（最新情報）カード -->
+        <section class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 relative overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                        <i class="fa-solid fa-id-card"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-1.5">
+                            <h2 class="text-sm font-bold text-slate-800 leading-tight">車検証情報（最新版）</h2>
+                            <span id="shakenCarBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">未選択</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">車ごとの車検満了日・2年更新の履歴管理</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button type="button" onclick="openShakenHistoryModal()" class="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs transition flex items-center space-x-1">
+                        <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
+                        <span>履歴 (<span id="shakenHistoryCount">0</span>)</span>
+                    </button>
+                    <button type="button" onclick="openShakenModal()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition flex items-center space-x-1">
+                        <i class="fa-solid fa-plus"></i>
+                        <span id="shakenActionBtnText">車検証を登録</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 車両基本情報（車を追加で登録した情報） -->
+            <div id="carBasicInfoBox" class="bg-slate-50 p-3.5 rounded-xl border border-slate-200/70 mb-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="space-y-1.5">
+                        <div class="flex items-center flex-wrap gap-1.5">
+                            <span id="latestShakenCarName" class="text-xs font-bold px-2 py-0.5 rounded bg-slate-800 text-white">マイカー1号</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">登録番号</span>
+                            <span id="latestShakenPlate" class="font-bold text-sm text-slate-800 tracking-wide">未登録</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">※車両の基本情報は「＋ 車を追加」から登録できます</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs border-t sm:border-t-0 sm:border-l border-slate-200 pt-2.5 sm:pt-0 sm:pl-3.5">
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">型式</span>
+                            <span id="latestShakenModel" class="font-semibold text-slate-700">-</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">初度登録年月</span>
+                            <span id="latestShakenFirstReg" class="font-semibold text-slate-700">-</span>
+                        </div>
+                        <div class="col-span-2">
+                            <span class="text-[10px] text-slate-400 block">車台番号</span>
+                            <span id="latestShakenChassis" class="font-mono font-semibold text-slate-700">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 車検証未登録時の表示 -->
+            <div id="shakenEmptyState" class="bg-slate-50/70 rounded-xl p-3.5 text-center border border-dashed border-slate-200">
+                <p class="text-xs font-medium text-slate-600">車検の有効期間（満了日）がまだ登録されていません</p>
+                <p class="text-[11px] text-slate-400 mt-0.5">右上の「車検証を登録」から交付日と満了日を登録してください</p>
+            </div>
+
+            <!-- 最新車検証情報（満了日・交付日・メモ）の表示 -->
+            <div id="shakenLatestCard" class="hidden space-y-2.5">
+                <div class="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200/80 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <span class="text-[11px] text-slate-500 block">有効期間の満了する日（車検満了日）</span>
+                        <div class="flex items-center flex-wrap gap-2 mt-0.5">
+                            <span id="latestShakenExpiry" class="text-lg font-bold text-slate-900">----/--/--</span>
+                            <span id="latestShakenCountdown" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">残り---日</span>
+                        </div>
+                    </div>
+                    <span id="latestShakenUpdated" class="text-[11px] font-medium text-slate-500 bg-white px-2.5 py-1 rounded-lg border border-slate-200">交付日: ----/--/--</span>
+                </div>
+                <div class="text-[11px] text-slate-500 px-1">
+                    <span id="latestShakenMemo" class="truncate block">メモ: なし</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 新規メンテナンス記録フォーム -->
+        <section class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <h2 class="text-base font-bold text-slate-800 flex items-center">
+                    <i class="fa-solid fa-pen-to-square text-blue-600 mr-2"></i>
+                    メンテナンスを記録する
+                </h2>
+                <div class="flex items-center space-x-1.5">
+                    <label for="recordCarSelect" class="text-xs font-semibold text-slate-500">対象車両:</label>
+                    <select id="recordCarSelect" class="text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- JSで動的生成 -->
+                    </select>
+                </div>
+            </div>
+
+            <form id="maintenanceForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-2">作業内容 <span class="text-rose-500">*</span></label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="categoryButtons">
+                        <button type="button" data-value="オイル交換" class="cat-btn active flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border-2 border-blue-600 bg-blue-50 text-blue-700 font-semibold text-sm transition">
+                            <i class="fa-solid fa-oil-can"></i>
+                            <span>オイル交換</span>
+                        </button>
+                        <button type="button" data-value="タイヤ交換" class="cat-btn flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-medium text-sm transition">
+                            <i class="fa-solid fa-dharmachakra"></i>
+                            <span>タイヤ交換</span>
+                        </button>
+                        <button type="button" data-value="フィルター交換" class="cat-btn flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-medium text-sm transition">
+                            <i class="fa-solid fa-filter"></i>
+                            <span>エレメント</span>
+                        </button>
+                        <button type="button" data-value="その他点検" class="cat-btn flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-medium text-sm transition">
+                            <i class="fa-solid fa-wrench"></i>
+                            <span>その他</span>
+                        </button>
+                    </div>
+                    <input type="hidden" id="categoryInput" value="オイル交換" required>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                        <label for="dateInput" class="block text-xs font-semibold text-slate-600 mb-1.5">実施日 <span class="text-rose-500">*</span></label>
+                        <input type="date" id="dateInput" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                    </div>
+                    <div>
+                        <label for="mileageInput" class="block text-xs font-semibold text-slate-600 mb-1.5">走行距離 (km)</label>
+                        <div class="relative">
+                            <input type="number" id="mileageInput" placeholder="例: 45200" min="0" class="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                            <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-medium">km</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="costInput" class="block text-xs font-semibold text-slate-600 mb-1.5">費用 (円)</label>
+                        <div class="relative">
+                            <input type="number" id="costInput" placeholder="例: 5500" min="0" class="w-full pl-3.5 pr-8 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                            <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-medium">円</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="memoInput" class="block text-xs font-semibold text-slate-600 mb-1.5">メモ（オイル銘柄、夏/冬タイヤ、店舗など）</label>
+                    <input type="text" id="memoInput" placeholder="例: 0W-20 化学合成油 / スタッドレスへ履き替え" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                </div>
+
+                <div class="pt-1">
+                    <button type="submit" id="submitBtn" class="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm shadow-sm shadow-blue-600/20 transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>メンテナンスを記録する</span>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- 給油情報記録フォーム -->
+        <section class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <h2 class="text-base font-bold text-slate-800 flex items-center">
+                    <i class="fa-solid fa-gas-pump text-rose-600 mr-2"></i>
+                    給油情報を記録する
+                </h2>
+                <div class="flex items-center space-x-2">
+                    <span id="fuelSummaryBadge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                        累計: 0L / 0円
+                    </span>
+                    <select id="fuelCarSelect" aria-label="給油対象車両" class="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500">
+                        <!-- JSで動的生成 -->
+                    </select>
+                </div>
+            </div>
+
+            <form id="fuelForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-2">油種 <span class="text-rose-500">*</span></label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="fuelCategoryButtons">
+                        <button type="button" data-value="レギュラー" class="fuel-cat-btn active flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border-2 border-rose-600 bg-rose-50 text-rose-700 font-semibold text-sm transition">
+                            <i class="fa-solid fa-droplet"></i>
+                            <span>レギュラー</span>
+                        </button>
+                        <button type="button" data-value="ハイオク" class="fuel-cat-btn flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-medium text-sm transition">
+                            <i class="fa-solid fa-fire-flame-curved"></i>
+                            <span>ハイオク</span>
+                        </button>
+                        <button type="button" data-value="軽油" class="fuel-cat-btn flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-medium text-sm transition">
+                            <i class="fa-solid fa-truck-droplet"></i>
+                            <span>軽油</span>
+                        </button>
+                        <button type="button" data-value="その他" class="fuel-cat-btn flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-medium text-sm transition">
+                            <i class="fa-solid fa-charging-station"></i>
+                            <span>その他</span>
+                        </button>
+                    </div>
+                    <input type="hidden" id="fuelCategoryInput" value="レギュラー" required>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label for="fuelDateInput" class="block text-xs font-semibold text-slate-600 mb-1.5">給油日 <span class="text-rose-500">*</span></label>
+                        <input type="date" id="fuelDateInput" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm">
+                    </div>
+                    <div>
+                        <label for="fuelMileageInput" class="block text-xs font-semibold text-slate-600 mb-1.5">走行距離 (km)</label>
+                        <div class="relative">
+                            <input type="number" id="fuelMileageInput" placeholder="例: 45500" min="0" class="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm">
+                            <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-medium">km</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="fuelAmountInput" class="block text-xs font-semibold text-slate-600 mb-1.5">給油量 (L)</label>
+                        <div class="relative">
+                            <input type="number" id="fuelAmountInput" step="0.01" placeholder="例: 35.5" min="0" class="w-full pl-3.5 pr-8 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm">
+                            <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-medium">L</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="fuelCostInput" class="block text-xs font-semibold text-slate-600 mb-1.5">金額 (円) <span class="text-rose-500">*</span></label>
+                        <div class="relative">
+                            <input type="number" id="fuelCostInput" required placeholder="例: 5800" min="0" class="w-full pl-3.5 pr-8 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm">
+                            <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-medium">円</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="fuelMemoInput" class="block text-xs font-semibold text-slate-600 mb-1.5">メモ（ガソリンスタンド名、単価など）</label>
+                    <input type="text" id="fuelMemoInput" placeholder="例: ENEOS 四日市SS / 165円/L" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm">
+                </div>
+
+                <div class="pt-1">
+                    <button type="submit" id="fuelSubmitBtn" class="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-sm shadow-sm shadow-rose-600/20 transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>給油情報を記録する</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- 給油記録履歴アコーディオン -->
+            <div class="mt-5 pt-4 border-t border-slate-200/80">
+                <button type="button" onclick="toggleFuelAccordion()" id="fuelAccordionToggle" aria-expanded="false" class="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 transition text-left">
+                    <span class="text-xs font-bold text-slate-700 flex items-center">
+                        <i class="fa-solid fa-list-ul text-rose-600 mr-2"></i>
+                        給油履歴
+                        <span id="fuelRecordCount" class="ml-2 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">0件</span>
+                    </span>
+                    <span class="flex items-center space-x-1.5 text-[11px] font-semibold text-slate-500">
+                        <span id="fuelAccordionLabel">表示する</span>
+                        <i id="fuelAccordionChevron" class="fa-solid fa-chevron-down text-xs transition-transform duration-200"></i>
+                    </span>
+                </button>
+                <div id="fuelAccordionContent" class="hidden mt-3 space-y-2.5">
+                    <!-- 燃費サマリーパネル -->
+                    <div id="fuelEfficiencySummary" class="grid grid-cols-3 gap-2 bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-2.5 text-center">
+                        <div>
+                            <span class="text-[10px] font-semibold text-slate-500 block">平均燃費</span>
+                            <span id="avgFuelEfficiency" class="text-sm font-bold text-emerald-700">--.- km/L</span>
+                        </div>
+                        <div class="border-x border-emerald-200/80">
+                            <span class="text-[10px] font-semibold text-slate-500 block">直近燃費</span>
+                            <span id="latestFuelEfficiency" class="text-sm font-bold text-slate-800">--.- km/L</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-semibold text-slate-500 block">燃費コスト目安</span>
+                            <span id="fuelCostPerKm" class="text-sm font-bold text-slate-800">--.- 円/km</span>
+                        </div>
+                    </div>
+                    <div id="fuelRecordsList" class="space-y-2">
+                        <!-- JSで動的に描画 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- メンテナンス履歴一覧セクション -->
+        <section class="space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 class="text-base font-bold text-slate-800 flex items-center">
+                    <i class="fa-solid fa-clock-rotate-left text-slate-600 mr-2"></i>
+                    メンテナンス履歴
+                    <span id="recordCount" class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">0件</span>
+                </h2>
+
+                <div class="flex items-center space-x-2">
+                    <select id="filterSelect" class="text-xs font-medium px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="ALL">すべて表示</option>
+                        <option value="オイル交換">オイル交換のみ</option>
+                        <option value="タイヤ交換">タイヤ交換のみ</option>
+                        <option value="フィルター交換">エレメントのみ</option>
+                        <option value="その他点検">その他のみ</option>
+                    </select>
+                    <button type="button" onclick="loadRecords(true)" title="再読み込み" class="p-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 transition">
+                        <i id="refreshIcon" class="fa-solid fa-arrows-rotate text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="recordsList" class="space-y-2.5">
+                <!-- JSで動的に描画 -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="text-center py-6 text-xs text-slate-400">
+        <p>CarLog - Googleスプレッドシート連携メンテナンス管理</p>
+    </footer>
+
+    <!-- Googleスプレッドシート連携設定モーダル -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden fade-in">
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-table text-emerald-600 text-lg"></i>
+                    <h3 class="font-bold text-slate-800">Googleスプレッドシート連携設定</h3>
+                </div>
+                <button type="button" onclick="closeSettingsModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-500 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-5 text-sm">
+                <!-- オイル交換リマインダー＆通知設定 -->
+                <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="font-bold text-slate-800 text-xs flex items-center space-x-1.5">
+                            <i class="fa-solid fa-bell text-amber-600"></i>
+                            <span>オイル交換リマインダー（1ヶ月前通知）</span>
+                        </label>
+                        <span id="notifStatusBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">通知OFF</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center">
+                        <div>
+                            <label for="oilCycleSelect" class="block text-[11px] text-slate-600 mb-1">交換サイクルの目安</label>
+                            <select id="oilCycleSelect" onchange="saveNotificationSettings()" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                <option value="90">3ヶ月（90日）ごと</option>
+                                <option value="180" selected>6ヶ月（180日）ごと【推奨】</option>
+                                <option value="365">1年（365日）ごと</option>
+                            </select>
+                        </div>
+                        <div class="pt-0 sm:pt-4">
+                            <button type="button" onclick="enableBrowserNotification()" id="enableNotifBtn" class="w-full py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center space-x-1.5">
+                                <i class="fa-solid fa-bell"></i>
+                                <span>スマホ・PC通知を許可する</span>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-500 leading-relaxed">
+                        次回交換目安の<strong>30日前（1ヶ月前）</strong>になると、アプリ上部の警告バナーとデバイスの通知でお知らせします。
+                    </p>
+                </div>
+
+                <!-- スマホへのインストール案内（PWA） -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-slate-800 text-xs flex items-center space-x-1.5">
+                            <i class="fa-solid fa-mobile-screen text-blue-600"></i>
+                            <span>スマホにアプリとしてインストール（PWA）</span>
+                        </span>
+                        <button type="button" onclick="triggerPwaInstall()" id="modalPwaBtn" class="hidden px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition">
+                            今すぐインストール
+                        </button>
+                    </div>
+                    <p class="text-[11px] text-slate-600 leading-relaxed">
+                        <strong>iPhone (Safari):</strong> 画面下の共有ボタン <i class="fa-solid fa-arrow-up-from-bracket text-slate-500"></i> → <strong>「ホーム画面に追加」</strong><br>
+                        <strong>Android (Chrome):</strong> 右上メニュー <i class="fa-solid fa-ellipsis-vertical text-slate-500"></i> → <strong>「アプリをインストール」</strong>
+                    </p>
+                </div>
+
+                <!-- 現在のURL入力 -->
+                <div class="bg-blue-50/70 border border-blue-200 rounded-xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label for="gasUrlInput" class="block font-bold text-slate-800 text-xs">
+                            1. Google Apps Script (GAS) のウェブアプリURL
+                        </label>
+                        <span id="modalSyncQueueStatus" class="text-[11px] font-semibold text-slate-600">未同期データ: 0件</span>
+                    </div>
+                    <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/xxxxx/exec" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <button type="button" onclick="clearGasUrl()" class="text-xs text-slate-500 hover:text-rose-600 underline">
+                            連携を解除（ローカル保存に戻す）
+                        </button>
+                        <div class="flex items-center space-x-2">
+                            <button type="button" onclick="triggerManualSync()" id="modalSyncNowBtn" class="hidden px-3 py-2 rounded-xl border border-blue-300 bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs transition">
+                                <i class="fa-solid fa-rotate mr-1"></i>今すぐ同期
+                            </button>
+                            <button type="button" onclick="saveGasUrl()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition">
+                                URLを保存して接続
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GASセットアップ手順＆コードコピー -->
+                <div class="space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-slate-800 text-xs">2. スプレッドシート側スクリプト（GAS）</span>
+                        <button type="button" id="copyCodeBtn" onclick="copyGasCode()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center space-x-1.5 transition">
+                            <i class="fa-regular fa-copy"></i>
+                            <span>コードをコピー</span>
+                        </button>
+                    </div>
+                    <ol class="text-[11px] text-slate-600 list-decimal list-inside space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <li>Googleスプレッドシートを開き「拡張機能 ＞ Apps Script」を選択</li>
+                        <li>下のコードを貼り付けて保存し、「デプロイ ＞ 新しいデプロイ（ウェブアプリ）」を実行</li>
+                        <li>アクセスできるユーザーを「全員」にして発行されたURLを上の欄へ貼り付け</li>
+                    </ol>
+                    <pre id="gasCodeBlock" class="bg-slate-900 text-slate-100 p-3 rounded-xl text-[11px] font-mono overflow-x-auto max-h-44 leading-relaxed"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 車を追加モーダル（車両基本情報の登録） -->
+    <div id="addCarModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden fade-in">
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-car text-blue-600 text-lg"></i>
+                    <h3 class="font-bold text-slate-800">新しい車を追加（車両基本情報）</h3>
+                </div>
+                <button type="button" onclick="closeAddCarModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200/70 flex items-center justify-center text-slate-500 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="addCarForm" class="p-5 overflow-y-auto space-y-4 text-sm">
+                <p class="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                    車両の基本情報（呼び名・ナンバー・型式など）を登録します。車検の満了日は追加後に「車検証を登録」から入力できます。
+                </p>
+
+                <div>
+                    <label for="addCarName" class="block text-xs font-semibold text-slate-600 mb-1">車両の呼び名（識別用） <span class="text-rose-500">*</span></label>
+                    <input type="text" id="addCarName" required placeholder="例: プリウス / N-BOX / 通勤用軽自動車" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label for="addCarPlate" class="block text-xs font-semibold text-slate-600 mb-1">自動車登録番号（ナンバー） <span class="text-rose-500">*</span></label>
+                        <input type="text" id="addCarPlate" required placeholder="例: 四日市 500 あ 12-34" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div>
+                        <label for="addCarModel" class="block text-xs font-semibold text-slate-600 mb-1">型式</label>
+                        <input type="text" id="addCarModel" placeholder="例: 6AA-ZVW51" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label for="addCarChassis" class="block text-xs font-semibold text-slate-600 mb-1">車台番号</label>
+                        <input type="text" id="addCarChassis" placeholder="例: ZVW51-1234567" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono">
+                    </div>
+                    <div>
+                        <label for="addCarFirstReg" class="block text-xs font-semibold text-slate-600 mb-1">初度登録年月</label>
+                        <input type="month" id="addCarFirstReg" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeAddCarModal()" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs transition">
+                        キャンセル
+                    </button>
+                    <button type="submit" id="addCarSubmitBtn" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>この車を追加する</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 車検証 登録・更新モーダル（車検固有情報のみ） -->
+    <div id="shakenModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden fade-in">
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-emerald-50/70">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-id-card text-emerald-600 text-lg"></i>
+                    <h3 id="shakenModalTitle" class="font-bold text-slate-800">車検証情報の登録・更新</h3>
+                </div>
+                <button type="button" onclick="closeShakenModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200/70 flex items-center justify-center text-slate-500 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="shakenForm" class="p-5 overflow-y-auto space-y-4 text-sm">
+                <input type="hidden" id="shakenTargetCarId" value="">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] text-slate-400 block">対象車両</span>
+                        <span id="shakenModalCarSummary" class="text-xs font-bold text-slate-800">マイカー1号</span>
+                    </div>
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">2年更新履歴</span>
+                </div>
+
+                <div id="shakenCarryOverNotice" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
+                    前回の車検満了日から2年後の日付を自動セットしました。内容を確認してください。
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label for="shakenIssueDate" class="block text-xs font-semibold text-slate-600 mb-1">交付年月日 <span class="text-rose-500">*</span></label>
+                        <input type="date" id="shakenIssueDate" required class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                    </div>
+                    <div>
+                        <label for="shakenExpiryDate" class="block text-xs font-semibold text-slate-600 mb-1">有効期間の満了する日 <span class="text-rose-500">*</span></label>
+                        <input type="date" id="shakenExpiryDate" required class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="shakenMemo" class="block text-xs font-semibold text-slate-600 mb-1">備考・メモ（車検工場、自賠責番号、費用など）</label>
+                    <input type="text" id="shakenMemo" placeholder="例: ディーラー車検 / 重量税・自賠責更新済み" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
+                </div>
+
+                <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeShakenModal()" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs transition">
+                        キャンセル
+                    </button>
+                    <button type="submit" id="shakenSubmitBtn" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-check"></i>
+                        <span>この内容で車検証を保存</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 車検証 履歴一覧モーダル -->
+    <div id="shakenHistoryModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden fade-in">
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-clock-rotate-left text-emerald-600"></i>
+                    <h3 id="shakenHistoryModalTitle" class="font-bold text-slate-800 text-sm">車検証更新履歴</h3>
+                </div>
+                <button type="button" onclick="closeShakenHistoryModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-500 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="shakenHistoryList" class="p-5 overflow-y-auto space-y-3 text-sm">
+                <!-- JSで履歴を描画 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 削除確認カスタムモーダル -->
+    <div id="deleteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 fade-in">
+            <div class="flex items-center space-x-3 text-rose-600">
+                <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-trash-can"></i>
+                </div>
+                <h3 id="deleteModalTitle" class="font-bold text-slate-800 text-base">記録を削除しますか？</h3>
+            </div>
+            <p id="deleteModalDesc" class="text-xs text-slate-600 leading-relaxed">
+                この記録を削除します。スプレッドシート連携中の場合、シートからも該当行が削除されます。
+            </p>
+            <div class="flex items-center justify-end space-x-2 pt-2">
+                <button type="button" onclick="closeDeleteModal()" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs transition">
+                    キャンセル
+                </button>
+                <button type="button" id="confirmDeleteBtn" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-sm transition">
+                    削除する
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- トースト通知コンテナ -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <script>
+        // ==========================================
+        // 1. Google Apps Script テンプレートコード
+        // ==========================================
+        const GAS_SOURCE_CODE = `// 車のメンテナンス＆車検証＆給油記録用 Google Apps Script
+const SHEET_NAME = 'メンテナンス記録';
+const SHAKEN_SHEET_NAME = '車検証履歴';
+const FUEL_SHEET_NAME = '給油記録';
+const CARS_SHEET_NAME = '車両一覧';
+
+function getOrCreateSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(['ID', '実施日', '作業内容', '走行距離(km)', '費用(円)', 'メモ', '登録日時', '車両ID', '車両名']);
+    sheet.getRange('A1:I1').setFontWeight('bold').setBackground('#eff6ff');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateCarsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CARS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(CARS_SHEET_NAME);
+    sheet.appendRow(['車両ID', '車両の呼び名', '登録番号(ナンバー)', '型式', '車台番号', '初度登録年月', '登録日時']);
+    sheet.getRange('A1:G1').setFontWeight('bold').setBackground('#e2e8f0');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateShakenSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHAKEN_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHAKEN_SHEET_NAME);
+    sheet.appendRow(['ID', '交付日', '有効期間満了日', '登録番号(ナンバー)', '型式', '車台番号', '初度登録年月', 'メモ', '登録日時', '車両ID', '車両名']);
+    sheet.getRange('A1:K1').setFontWeight('bold').setBackground('#ecfdf5');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateFuelSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(FUEL_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(FUEL_SHEET_NAME);
+    sheet.appendRow(['ID', '給油日', '油種', '給油量(L)', '金額(円)', 'メモ', '登録日時', '車両ID', '車両名', '走行距離(km)']);
+    sheet.getRange('A1:J1').setFontWeight('bold').setBackground('#fff1f2');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function formatDateCell(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(val);
+}
+
+function hasIdInSheet(sheet, id) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return false;
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  const target = String(id);
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === target) return true;
+  }
+  return false;
+}
+
+function doGet(e) {
+  const maintSheet = getOrCreateSheet();
+  const maintData = maintSheet.getDataRange().getValues();
+  const records = [];
+  for (let i = 1; i < maintData.length; i++) {
+    const row = maintData[i];
+    if (!row[0]) continue;
+    records.push({
+      id: String(row[0]),
+      date: formatDateCell(row[1]),
+      category: String(row[2]),
+      mileage: row[3] !== '' ? Number(row[3]) : null,
+      cost: row[4] !== '' ? Number(row[4]) : null,
+      memo: String(row[5] || ''),
+      carId: String(row[7] || 'default-car'),
+      carName: String(row[8] || '')
+    });
+  }
+
+  const shakenSheet = getOrCreateShakenSheet();
+  const shakenData = shakenSheet.getDataRange().getValues();
+  const shakenRecords = [];
+  for (let i = 1; i < shakenData.length; i++) {
+    const row = shakenData[i];
+    if (!row[0]) continue;
+    shakenRecords.push({
+      id: String(row[0]),
+      issueDate: formatDateCell(row[1]),
+      expiryDate: formatDateCell(row[2]),
+      plate: String(row[3] || ''),
+      model: String(row[4] || ''),
+      chassis: String(row[5] || ''),
+      firstReg: String(row[6] || ''),
+      memo: String(row[7] || ''),
+      carId: String(row[9] || 'default-car'),
+      carName: String(row[10] || '')
+    });
+  }
+
+  const fuelSheet = getOrCreateFuelSheet();
+  const fuelData = fuelSheet.getDataRange().getValues();
+  const fuelRecords = [];
+  for (let i = 1; i < fuelData.length; i++) {
+    const row = fuelData[i];
+    if (!row[0]) continue;
+    fuelRecords.push({
+      id: String(row[0]),
+      date: formatDateCell(row[1]),
+      category: String(row[2] || 'レギュラー'),
+      amount: row[3] !== '' ? Number(row[3]) : null,
+      cost: row[4] !== '' ? Number(row[4]) : 0,
+      memo: String(row[5] || ''),
+      carId: String(row[7] || 'default-car'),
+      carName: String(row[8] || ''),
+      mileage: row[9] !== '' && row[9] !== undefined ? Number(row[9]) : null
+    });
+  }
+
+  const carsSheet = getOrCreateCarsSheet();
+  const carsData = carsSheet.getDataRange().getValues();
+  const cars = [];
+  for (let i = 1; i < carsData.length; i++) {
+    const row = carsData[i];
+    if (!row[0]) continue;
+    cars.push({
+      id: String(row[0]),
+      name: String(row[1] || ''),
+      plate: String(row[2] || ''),
+      model: String(row[3] || ''),
+      chassis: String(row[4] || ''),
+      firstReg: String(row[5] || '')
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({
+    status: 'ok',
+    records: records,
+    shakenRecords: shakenRecords,
+    fuelRecords: fuelRecords,
+    cars: cars
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const payload = JSON.parse(e.postData.contents);
+
+  if (payload.action === 'add') {
+    const sheet = getOrCreateSheet();
+    const r = payload.record;
+    if (!hasIdInSheet(sheet, r.id)) {
+      sheet.appendRow([
+        r.id, r.date, r.category,
+        r.mileage !== null ? r.mileage : '',
+        r.cost !== null ? r.cost : '',
+        r.memo || '', new Date(),
+        r.carId || 'default-car', r.carName || ''
+      ]);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (payload.action === 'add_car') {
+    const sheet = getOrCreateCarsSheet();
+    const c = payload.car;
+    if (!hasIdInSheet(sheet, c.id)) {
+      sheet.appendRow([
+        c.id, c.name, c.plate || '', c.model || '', c.chassis || '', c.firstReg || '', new Date()
+      ]);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (payload.action === 'add_shaken') {
+    const sheet = getOrCreateShakenSheet();
+    const s = payload.record;
+    if (!hasIdInSheet(sheet, s.id)) {
+      sheet.appendRow([
+        s.id, s.issueDate, s.expiryDate, s.plate,
+        s.model || '', s.chassis || '', s.firstReg || '',
+        s.memo || '', new Date(),
+        s.carId || 'default-car', s.carName || ''
+      ]);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (payload.action === 'add_fuel') {
+    const sheet = getOrCreateFuelSheet();
+    const f = payload.record;
+    if (!hasIdInSheet(sheet, f.id)) {
+      sheet.appendRow([
+        f.id, f.date, f.category,
+        f.amount !== null ? f.amount : '',
+        f.cost !== null ? f.cost : '',
+        f.memo || '', new Date(),
+        f.carId || 'default-car', f.carName || '',
+        f.mileage !== null && f.mileage !== undefined ? f.mileage : ''
+      ]);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (payload.action === 'delete') {
+    const sheet = getOrCreateSheet();
+    const data = sheet.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][0]) === String(payload.id)) {
+        sheet.deleteRow(i + 1);
+        break;
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (payload.action === 'delete_shaken') {
+    const sheet = getOrCreateShakenSheet();
+    const data = sheet.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][0]) === String(payload.id)) {
+        sheet.deleteRow(i + 1);
+        break;
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (payload.action === 'delete_fuel') {
+    const sheet = getOrCreateFuelSheet();
+    const data = sheet.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][0]) === String(payload.id)) {
+        sheet.deleteRow(i + 1);
+        break;
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (payload.action === 'delete_car') {
+    const maintSheet = getOrCreateSheet();
+    const maintData = maintSheet.getDataRange().getValues();
+    for (let i = maintData.length - 1; i >= 1; i--) {
+      if (String(maintData[i][7] || 'default-car') === String(payload.carId)) {
+        maintSheet.deleteRow(i + 1);
+      }
+    }
+    const shakenSheet = getOrCreateShakenSheet();
+    const shakenData = shakenSheet.getDataRange().getValues();
+    for (let i = shakenData.length - 1; i >= 1; i--) {
+      if (String(shakenData[i][9] || 'default-car') === String(payload.carId)) {
+        shakenSheet.deleteRow(i + 1);
+      }
+    }
+    const fuelSheet = getOrCreateFuelSheet();
+    const fuelData = fuelSheet.getDataRange().getValues();
+    for (let i = fuelData.length - 1; i >= 1; i--) {
+      if (String(fuelData[i][7] || 'default-car') === String(payload.carId)) {
+        fuelSheet.deleteRow(i + 1);
+      }
+    }
+    const carsSheet = getOrCreateCarsSheet();
+    const carsData = carsSheet.getDataRange().getValues();
+    for (let i = carsData.length - 1; i >= 1; i--) {
+      if (String(carsData[i][0]) === String(payload.carId)) {
+        carsSheet.deleteRow(i + 1);
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ status: 'unknown_action' })).setMimeType(ContentService.MimeType.JSON);
+}`;
+
+        // ==========================================
+        // 2. アプリ状態管理 & オフラインDB（IndexedDB）
+        // ==========================================
+        const STORAGE_KEY_GAS_URL = 'carlog_gas_url';
+        const STORAGE_KEY_RECORDS = 'carlog_local_records';
+        const STORAGE_KEY_SHAKEN = 'carlog_local_shaken';
+        const STORAGE_KEY_FUEL = 'carlog_local_fuel';
+        const STORAGE_KEY_CARS = 'carlog_local_cars';
+        const STORAGE_KEY_SYNC_QUEUE = 'carlog_sync_queue';
+        const STORAGE_KEY_SELECTED_CAR = 'carlog_selected_car_id';
+        const STORAGE_KEY_OIL_CYCLE = 'carlog_oil_cycle_days';
+        const STORAGE_KEY_NOTIF_ENABLED = 'carlog_notif_enabled';
+        const STORAGE_KEY_LAST_NOTIFIED_DATE = 'carlog_last_notified_date';
+
+        const IDB_NAME = 'CarLogOfflineDB';
+        const IDB_VERSION = 1;
+        let idbInstance = null;
+
+        let gasUrl = localStorage.getItem(STORAGE_KEY_GAS_URL) || '';
+        let records = [];
+        let shakenRecords = [];
+        let fuelRecords = [];
+        let carsMaster = [];
+        let syncQueue = [];
+        let isSyncing = false;
+
+        let carsList = [];
+        let selectedCarId = localStorage.getItem(STORAGE_KEY_SELECTED_CAR) || 'ALL';
+        let oilCycleDays = Number(localStorage.getItem(STORAGE_KEY_OIL_CYCLE)) || 180;
+        let notifEnabled = localStorage.getItem(STORAGE_KEY_NOTIF_ENABLED) === 'true';
+
+        let deleteTargetId = null;
+        let deleteTargetType = 'maintenance';
+        let deferredInstallPrompt = null;
+
+        // ブラウザ内IndexedDBの初期化・読み書きヘルパー
+        function openOfflineDB() {
+            if (idbInstance) return Promise.resolve(idbInstance);
+            return new Promise((resolve) => {
+                if (!('indexedDB' in window)) {
+                    resolve(null);
+                    return;
+                }
+                const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('kv_store')) {
+                        db.createObjectStore('kv_store', { keyPath: 'key' });
+                    }
+                };
+                req.onsuccess = (e) => {
+                    idbInstance = e.target.result;
+                    resolve(idbInstance);
+                };
+                req.onerror = () => resolve(null);
+            });
+        }
+
+        async function dbGet(key, fallbackKey) {
+            const db = await openOfflineDB();
+            if (db) {
+                const val = await new Promise((resolve) => {
+                    try {
+                        const tx = db.transaction('kv_store', 'readonly');
+                        const store = tx.objectStore('kv_store');
+                        const req = store.get(key);
+                        req.onsuccess = () => resolve(req.result ? req.result.value : undefined);
+                        req.onerror = () => resolve(undefined);
+                    } catch (e) {
+                        resolve(undefined);
+                    }
+                });
+                if (val !== undefined) return val;
+            }
+            const raw = localStorage.getItem(fallbackKey);
+            return raw ? JSON.parse(raw) : [];
+        }
+
+        async function dbSet(key, fallbackKey, value) {
+            try {
+                localStorage.setItem(fallbackKey, JSON.stringify(value));
+            } catch (e) {
+                console.warn('localStorage fallback write warning:', e);
+            }
+            const db = await openOfflineDB();
+            if (db) {
+                await new Promise((resolve) => {
+                    try {
+                        const tx = db.transaction('kv_store', 'readwrite');
+                        const store = tx.objectStore('kv_store');
+                        store.put({ key, value });
+                        tx.oncomplete = () => resolve();
+                        tx.onerror = () => resolve();
+                    } catch (e) {
+                        resolve();
+                    }
+                });
+            }
+        }
+
+        async function persistAllLocalData() {
+            await Promise.all([
+                dbSet('records', STORAGE_KEY_RECORDS, records),
+                dbSet('shakenRecords', STORAGE_KEY_SHAKEN, shakenRecords),
+                dbSet('fuelRecords', STORAGE_KEY_FUEL, fuelRecords),
+                dbSet('carsMaster', STORAGE_KEY_CARS, carsMaster)
+            ]);
+        }
+
+        async function loadAllLocalData() {
+            const [r, s, f, c, q] = await Promise.all([
+                dbGet('records', STORAGE_KEY_RECORDS),
+                dbGet('shakenRecords', STORAGE_KEY_SHAKEN),
+                dbGet('fuelRecords', STORAGE_KEY_FUEL),
+                dbGet('carsMaster', STORAGE_KEY_CARS),
+                dbGet('syncQueue', STORAGE_KEY_SYNC_QUEUE)
+            ]);
+            records = Array.isArray(r) ? r : [];
+            shakenRecords = Array.isArray(s) ? s : [];
+            fuelRecords = Array.isArray(f) ? f : [];
+            carsMaster = Array.isArray(c) ? c : [];
+            syncQueue = Array.isArray(q) ? q : [];
+        }
+
+        // ==========================================
+        // 2.5 非同期バックグラウンド同期エンジン
+        // ==========================================
+        async function enqueueSyncOperation(action, payload) {
+            if (!gasUrl) return;
+
+            // 未送信のまま削除された場合はキューを相殺して無駄な通信を省く
+            if (action === 'delete' || action === 'delete_shaken' || action === 'delete_fuel') {
+                const addActionMap = {
+                    delete: 'add',
+                    delete_shaken: 'add_shaken',
+                    delete_fuel: 'add_fuel'
+                };
+                const targetAddAction = addActionMap[action];
+                const pendingAddIdx = syncQueue.findIndex(
+                    item => item.action === targetAddAction && item.payload?.record?.id === payload.id
+                );
+                if (pendingAddIdx !== -1) {
+                    syncQueue.splice(pendingAddIdx, 1);
+                    await dbSet('syncQueue', STORAGE_KEY_SYNC_QUEUE, syncQueue);
+                    updateConnectionUI();
+                    return;
+                }
+            }
+
+            if (action === 'delete_car') {
+                const targetCarId = payload.carId;
+                const hadPendingCarAdd = syncQueue.some(
+                    item => item.action === 'add_car' && item.payload?.car?.id === targetCarId
+                );
+                syncQueue = syncQueue.filter(item => {
+                    if (item.action === 'add_car' && item.payload?.car?.id === targetCarId) return false;
+                    if (item.payload?.record?.carId === targetCarId) return false;
+                    return true;
+                });
+                if (hadPendingCarAdd) {
+                    await dbSet('syncQueue', STORAGE_KEY_SYNC_QUEUE, syncQueue);
+                    updateConnectionUI();
+                    return;
+                }
+            }
+
+            syncQueue.push({
+                queueId: 'q-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+                action,
+                payload,
+                createdAt: new Date().toISOString(),
+                retryCount: 0
+            });
+            await dbSet('syncQueue', STORAGE_KEY_SYNC_QUEUE, syncQueue);
+            updateConnectionUI();
+
+            // オンラインなら非同期でバックグラウンド送信を開始（UIはブロックしない）
+            if (navigator.onLine) {
+                processSyncQueue(false);
+            }
+        }
+
+        async function processSyncQueue(showFeedback = false) {
+            if (!gasUrl || isSyncing) return;
+            if (!navigator.onLine) {
+                updateConnectionUI();
+                if (showFeedback) showToast('現在オフラインです。オンライン復帰時に自動同期します', 'info');
+                return;
+            }
+            if (syncQueue.length === 0) {
+                updateConnectionUI();
+                return;
+            }
+
+            isSyncing = true;
+            updateConnectionUI();
+            let syncedCount = 0;
+
+            try {
+                while (syncQueue.length > 0 && navigator.onLine) {
+                    const currentTask = syncQueue[0];
+                    const res = await fetch(gasUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: currentTask.action, ...currentTask.payload })
+                    });
+                    const result = await res.json();
+                    if (result && result.status === 'ok') {
+                        syncQueue.shift();
+                        syncedCount++;
+                        await dbSet('syncQueue', STORAGE_KEY_SYNC_QUEUE, syncQueue);
+                        updateConnectionUI();
+                    } else {
+                        throw new Error('GAS sync rejected');
+                    }
+                }
+                if (showFeedback && syncedCount > 0) {
+                    showToast(`${syncedCount}件のデータをスプレッドシートへ同期しました`, 'success');
+                }
+            } catch (err) {
+                console.warn('Background sync paused (will retry automatically):', err);
+                if (syncQueue[0]) {
+                    syncQueue[0].retryCount = (syncQueue[0].retryCount || 0) + 1;
+                    await dbSet('syncQueue', STORAGE_KEY_SYNC_QUEUE, syncQueue);
+                }
+                if (showFeedback) {
+                    showToast('一部の同期に失敗しました。後ほど自動で再送信します', 'error');
+                }
+            } finally {
+                isSyncing = false;
+                updateConnectionUI();
+            }
+        }
+
+        async function triggerManualSync() {
+            if (!gasUrl) {
+                openSettingsModal();
+                return;
+            }
+            await processSyncQueue(true);
+            await loadRecords(true);
+        }
+
+        // ==========================================
+        // 3. 初期化・PWA設定
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const todayStr = new Date().toISOString().split('T')[0];
+            document.getElementById('dateInput').value = todayStr;
+            document.getElementById('fuelDateInput').value = todayStr;
+            document.getElementById('gasCodeBlock').textContent = GAS_SOURCE_CODE;
+
+            setupPwaAssets();
+            setupCategoryButtons();
+            setupFuelCategoryButtons();
+
+            document.getElementById('maintenanceForm').addEventListener('submit', handleFormSubmit);
+            document.getElementById('fuelForm').addEventListener('submit', handleFuelFormSubmit);
+            document.getElementById('addCarForm').addEventListener('submit', handleAddCarSubmit);
+            document.getElementById('shakenForm').addEventListener('submit', handleShakenSubmit);
+            document.getElementById('filterSelect').addEventListener('change', renderRecords);
+            document.getElementById('confirmDeleteBtn').addEventListener('click', executeDelete);
+
+            // オンライン復帰・画面復帰・定期バックグラウンド同期リスナー
+            window.addEventListener('online', () => {
+                updateConnectionUI();
+                showToast('オンラインに復帰しました。スプレッドシートと自動同期します...', 'info');
+                processSyncQueue(true).then(() => loadRecords(false));
+            });
+            window.addEventListener('offline', () => {
+                updateConnectionUI();
+                showToast('オフラインになりました。データはブラウザ内に一時保存されます', 'info');
+            });
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && gasUrl && navigator.onLine) {
+                    processSyncQueue(false);
+                }
+            });
+            setInterval(() => {
+                if (gasUrl && navigator.onLine && syncQueue.length > 0 && !isSyncing) {
+                    processSyncQueue(false);
+                }
+            }, 30000);
+
+            updateConnectionUI();
+            loadRecords(false);
+        });
+
+        function setupPwaAssets() {
+            const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0f172a"/><circle cx="256" cy="256" r="180" fill="#2563eb"/><path d="M144 280l28-76c8-20 26-32 48-32h72c22 0 40 12 48 32l28 76v64c0 12-10 22-22 22h-16c-12 0-22-10-22-22v-16H204v16c0 12-10 22-22 22h-16c-12 0-22-10-22-22v-64zm52-16a20 20 0 1 0 0-40 20 20 0 0 0 0 40zm120 0a20 20 0 1 0 0-40 20 20 0 0 0 0 40z" fill="#ffffff"/></svg>`;
+            const iconUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgIcon);
+            const appleIcon = document.getElementById('appleTouchIcon');
+            if (appleIcon) appleIcon.href = iconUrl;
+
+            const manifest = {
+                name: 'CarLog - 愛車メンテナンス記録',
+                short_name: 'CarLog',
+                start_url: '.',
+                display: 'standalone',
+                background_color: '#f1f5f9',
+                theme_color: '#0f172a',
+                icons: [{ src: iconUrl, sizes: '512x512', type: 'image/svg+xml' }]
+            };
+            const manifestEl = document.getElementById('dynamicManifest');
+            if (manifestEl) {
+                manifestEl.href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+            }
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredInstallPrompt = e;
+                const hdrBtn = document.getElementById('pwaInstallBtn');
+                const modalBtn = document.getElementById('modalPwaBtn');
+                if (hdrBtn) {
+                    hdrBtn.classList.remove('hidden');
+                    hdrBtn.classList.add('flex');
+                }
+                if (modalBtn) modalBtn.classList.remove('hidden');
+            });
+        }
+
+        async function triggerPwaInstall() {
+            if (!deferredInstallPrompt) {
+                showToast('ブラウザメニューの「ホーム画面に追加」または「アプリをインストール」をご利用ください', 'info');
+                return;
+            }
+            deferredInstallPrompt.prompt();
+            const choice = await deferredInstallPrompt.userChoice;
+            if (choice.outcome === 'accepted') {
+                showToast('ホーム画面への追加を開始しました', 'success');
+            }
+            deferredInstallPrompt = null;
+            document.getElementById('pwaInstallBtn')?.classList.add('hidden');
+            document.getElementById('modalPwaBtn')?.classList.add('hidden');
+        }
+
+        function setupCategoryButtons() {
+            const buttons = document.querySelectorAll('.cat-btn');
+            const hiddenInput = document.getElementById('categoryInput');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => {
+                        b.className = 'cat-btn flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-medium text-sm transition';
+                    });
+                    btn.className = 'cat-btn active flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border-2 border-blue-600 bg-blue-50 text-blue-700 font-semibold text-sm transition';
+                    hiddenInput.value = btn.dataset.value;
+                });
+            });
+        }
+
+        function setupFuelCategoryButtons() {
+            const buttons = document.querySelectorAll('.fuel-cat-btn');
+            const hiddenInput = document.getElementById('fuelCategoryInput');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => {
+                        b.className = 'fuel-cat-btn flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-medium text-sm transition';
+                    });
+                    btn.className = 'fuel-cat-btn active flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border-2 border-rose-600 bg-rose-50 text-rose-700 font-semibold text-sm transition';
+                    hiddenInput.value = btn.dataset.value;
+                });
+            });
+        }
+
+        // ==========================================
+        // 4. データ読み込み・車両リスト構築（オフラインファースト）
+        // ==========================================
+        async function loadRecords(showNotification = false) {
+            const refreshIcon = document.getElementById('refreshIcon');
+            if (refreshIcon) refreshIcon.classList.add('fa-spin');
+
+            try {
+                // 1. まずブラウザ内DB(IndexedDB)から即時ロードして画面描画
+                await loadAllLocalData();
+                sortRecords();
+                rebuildCarsList();
+                renderCarTabs();
+                renderDashboard();
+                renderRecords();
+                renderFuelRecords();
+                updateConnectionUI();
+
+                // 2. GAS連携中かつオンラインなら未送信キューを先にフラッシュしてから最新を取得
+                if (gasUrl) {
+                    if (!navigator.onLine) {
+                        if (showNotification) showToast('オフラインのためローカル保存データを表示しています', 'info');
+                        return;
+                    }
+
+                    if (syncQueue.length > 0) {
+                        await processSyncQueue(false);
+                    }
+
+                    // まだ未送信が残っている場合はローカルの最新状態を優先保護
+                    if (syncQueue.length > 0) {
+                        if (showNotification) showToast('未送信データがあるためローカル状態を維持しています', 'info');
+                        return;
+                    }
+
+                    const res = await fetch(gasUrl);
+                    const data = await res.json();
+                    if (data.status === 'ok') {
+                        records = Array.isArray(data.records) ? data.records : [];
+                        shakenRecords = Array.isArray(data.shakenRecords) ? data.shakenRecords : [];
+                        fuelRecords = Array.isArray(data.fuelRecords) ? data.fuelRecords : [];
+                        carsMaster = Array.isArray(data.cars) ? data.cars : [];
+
+                        await persistAllLocalData();
+                        sortRecords();
+                        rebuildCarsList();
+                        renderCarTabs();
+                        renderDashboard();
+                        renderRecords();
+                        renderFuelRecords();
+
+                        if (showNotification) showToast('スプレッドシートと同期しました', 'success');
+                    } else {
+                        throw new Error('GAS response invalid');
+                    }
+                } else if (showNotification) {
+                    showToast('ブラウザ内データを再読み込みしました', 'info');
+                }
+            } catch (err) {
+                console.warn('Load / Sync warning:', err);
+                if (showNotification) {
+                    showToast('スプレッドシートに接続できないため、オフライン保存データを表示しています', 'info');
+                }
+            } finally {
+                if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+                updateConnectionUI();
+            }
+        }
+
+        function sortRecords() {
+            records.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            shakenRecords.sort((a, b) => (b.expiryDate || '').localeCompare(a.expiryDate || ''));
+            fuelRecords.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        }
+
+        function rebuildCarsList() {
+            const map = new Map();
+            carsMaster.forEach(c => {
+                if (!c || !c.id) return;
+                map.set(c.id, {
+                    id: c.id,
+                    name: c.name || c.plate || 'マイカー',
+                    plate: c.plate || '',
+                    model: c.model || '',
+                    chassis: c.chassis || '',
+                    firstReg: c.firstReg || ''
+                });
+            });
+            shakenRecords.forEach(s => {
+                const cid = s.carId || 'default-car';
+                if (!map.has(cid)) {
+                    map.set(cid, {
+                        id: cid,
+                        name: s.carName || s.plate || 'マイカー1号',
+                        plate: s.plate || '',
+                        model: s.model || '',
+                        chassis: s.chassis || '',
+                        firstReg: s.firstReg || ''
+                    });
+                } else {
+                    const existing = map.get(cid);
+                    if (!existing.plate && s.plate) existing.plate = s.plate;
+                    if (!existing.model && s.model) existing.model = s.model;
+                    if (!existing.chassis && s.chassis) existing.chassis = s.chassis;
+                    if (!existing.firstReg && s.firstReg) existing.firstReg = s.firstReg;
+                }
+            });
+            records.forEach(r => {
+                const cid = r.carId || 'default-car';
+                if (!map.has(cid)) {
+                    map.set(cid, { id: cid, name: r.carName || 'マイカー1号', plate: '', model: '', chassis: '', firstReg: '' });
+                }
+            });
+            fuelRecords.forEach(f => {
+                const cid = f.carId || 'default-car';
+                if (!map.has(cid)) {
+                    map.set(cid, { id: cid, name: f.carName || 'マイカー1号', plate: '', model: '', chassis: '', firstReg: '' });
+                }
+            });
+
+            if (map.size === 0) {
+                map.set('default-car', { id: 'default-car', name: 'マイカー1号', plate: '', model: '', chassis: '', firstReg: '' });
+            }
+
+            carsList = Array.from(map.values());
+
+            if (selectedCarId !== 'ALL' && !carsList.some(c => c.id === selectedCarId)) {
+                selectedCarId = carsList.length === 1 ? carsList[0].id : 'ALL';
+                localStorage.setItem(STORAGE_KEY_SELECTED_CAR, selectedCarId);
+            }
+            if (carsList.length === 1 && selectedCarId === 'ALL') {
+                selectedCarId = carsList[0].id;
+            }
+        }
+
+        function getActiveCarIdForShaken() {
+            if (selectedCarId !== 'ALL' && carsList.some(c => c.id === selectedCarId)) {
+                return selectedCarId;
+            }
+            return carsList[0] ? carsList[0].id : 'default-car';
+        }
+
+        function selectCarTab(carId) {
+            selectedCarId = carId;
+            localStorage.setItem(STORAGE_KEY_SELECTED_CAR, selectedCarId);
+            renderCarTabs();
+            renderDashboard();
+            renderRecords();
+            renderFuelRecords();
+        }
+
+        function renderCarTabs() {
+            const container = document.getElementById('carTabsContainer');
+            const deleteBtn = document.getElementById('deleteCarBtn');
+            const maintCarSelect = document.getElementById('recordCarSelect');
+            const fuelCarSelect = document.getElementById('fuelCarSelect');
+
+            const tabsHtml = [];
+            if (carsList.length > 1) {
+                const isAll = selectedCarId === 'ALL';
+                tabsHtml.push(`
+                    <button type="button" onclick="selectCarTab('ALL')" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center space-x-1.5 ${isAll ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span>すべての車 (${carsList.length})</span>
+                    </button>
+                `);
+            }
+
+            carsList.forEach(car => {
+                const active = selectedCarId === car.id;
+                tabsHtml.push(`
+                    <button type="button" onclick="selectCarTab('${escapeHtml(car.id)}')" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center space-x-1.5 ${active ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                        <i class="fa-solid fa-car"></i>
+                        <span>${escapeHtml(car.name)}</span>
+                    </button>
+                `);
+            });
+            container.innerHTML = tabsHtml.join('');
+
+            if (deleteBtn) {
+                if (selectedCarId !== 'ALL') {
+                    deleteBtn.classList.remove('hidden');
+                    deleteBtn.classList.add('flex');
+                } else {
+                    deleteBtn.classList.add('hidden');
+                    deleteBtn.classList.remove('flex');
+                }
+            }
+
+            const optionsHtml = carsList.map(car =>
+                `<option value="${escapeHtml(car.id)}">${escapeHtml(car.name)}</option>`
+            ).join('');
+
+            const targetCarId = getActiveCarIdForShaken();
+            if (maintCarSelect) {
+                maintCarSelect.innerHTML = optionsHtml;
+                maintCarSelect.value = targetCarId;
+            }
+            if (fuelCarSelect) {
+                fuelCarSelect.innerHTML = optionsHtml;
+                fuelCarSelect.value = targetCarId;
+            }
+
+            const activeCar = carsList.find(c => c.id === targetCarId);
+            const badgeEl = document.getElementById('shakenCarBadge');
+            if (badgeEl) {
+                badgeEl.textContent = activeCar ? activeCar.name : '未選択';
+            }
+        }
+
+        // ==========================================
+        // 4.5 ダッシュボード・履歴描画＆車検証・削除処理
+        // ==========================================
+        function renderDashboard() {
+            const targetCarId = getActiveCarIdForShaken();
+            const carRecords = selectedCarId === 'ALL'
+                ? records
+                : records.filter(r => (r.carId || 'default-car') === selectedCarId);
+
+            // オイル交換サマリー
+            const lastOil = carRecords.find(r => r.category === 'オイル交換');
+            const lastOilDateEl = document.getElementById('lastOilDate');
+            const oilDaysAgoEl = document.getElementById('oilDaysAgo');
+            const nextOilScheduleEl = document.getElementById('nextOilSchedule');
+            const lastOilDetailEl = document.getElementById('lastOilDetail');
+            const alertBanner = document.getElementById('oilAlertBanner');
+
+            if (lastOil) {
+                lastOilDateEl.textContent = lastOil.date;
+                const diffDays = calcDaysDiffFromToday(lastOil.date);
+                oilDaysAgoEl.textContent = diffDays === 0 ? '今日' : `${diffDays}日前`;
+
+                const details = [];
+                if (lastOil.mileage !== null && lastOil.mileage !== undefined) details.push(`${Number(lastOil.mileage).toLocaleString()}km`);
+                if (lastOil.memo) details.push(lastOil.memo);
+                if (selectedCarId === 'ALL' && lastOil.carName) details.unshift(`[${lastOil.carName}]`);
+                lastOilDetailEl.textContent = details.length > 0 ? details.join(' / ') : '詳細メモなし';
+
+                // 次回交換目安（1ヶ月前アラート判定）
+                const nextDate = new Date(lastOil.date + 'T00:00:00');
+                nextDate.setDate(nextDate.getDate() + oilCycleDays);
+                const nextDateStr = nextDate.toISOString().split('T')[0];
+                const daysUntilNext = -calcDaysDiffFromToday(nextDateStr);
+
+                nextOilScheduleEl.classList.remove('hidden');
+                if (daysUntilNext < 0) {
+                    nextOilScheduleEl.textContent = `交換目安(${nextDateStr})を${Math.abs(daysUntilNext)}日超過`;
+                    nextOilScheduleEl.className = 'text-[11px] font-bold text-rose-600 mt-0.5';
+                } else {
+                    nextOilScheduleEl.textContent = `次回目安: ${nextDateStr}（あと${daysUntilNext}日）`;
+                    nextOilScheduleEl.className = 'text-[11px] font-semibold text-amber-700 mt-0.5';
+                }
+
+                if (daysUntilNext <= 30 && alertBanner) {
+                    alertBanner.classList.remove('hidden');
+                    document.getElementById('oilAlertTitle').textContent =
+                        daysUntilNext < 0 ? 'オイル交換の推奨時期を過ぎています！' : 'オイル交換の時期（1ヶ月前）が近づいています';
+                    document.getElementById('oilAlertDesc').textContent =
+                        `前回交換日（${lastOil.date}）から${oilCycleDays}日サイクルでの次回目安は ${nextDateStr}（${daysUntilNext < 0 ? Math.abs(daysUntilNext) + '日超過' : 'あと' + daysUntilNext + '日'}）です。`;
+                    triggerOilReminderNotification(nextDateStr, daysUntilNext);
+                } else if (alertBanner) {
+                    alertBanner.classList.add('hidden');
+                }
+            } else {
+                lastOilDateEl.textContent = '----/--/--';
+                oilDaysAgoEl.textContent = '記録なし';
+                nextOilScheduleEl.classList.add('hidden');
+                lastOilDetailEl.textContent = 'まだ記録がありません';
+                if (alertBanner) alertBanner.classList.add('hidden');
+            }
+
+            // タイヤ交換サマリー
+            const lastTire = carRecords.find(r => r.category === 'タイヤ交換');
+            const lastTireDateEl = document.getElementById('lastTireDate');
+            const tireDaysAgoEl = document.getElementById('tireDaysAgo');
+            const lastTireDetailEl = document.getElementById('lastTireDetail');
+
+            if (lastTire) {
+                lastTireDateEl.textContent = lastTire.date;
+                const diffDays = calcDaysDiffFromToday(lastTire.date);
+                tireDaysAgoEl.textContent = diffDays === 0 ? '今日' : `${diffDays}日前`;
+                const details = [];
+                if (lastTire.mileage !== null && lastTire.mileage !== undefined) details.push(`${Number(lastTire.mileage).toLocaleString()}km`);
+                if (lastTire.memo) details.push(lastTire.memo);
+                if (selectedCarId === 'ALL' && lastTire.carName) details.unshift(`[${lastTire.carName}]`);
+                lastTireDetailEl.textContent = details.length > 0 ? details.join(' / ') : '詳細メモなし';
+            } else {
+                lastTireDateEl.textContent = '----/--/--';
+                tireDaysAgoEl.textContent = '記録なし';
+                lastTireDetailEl.textContent = 'まだ記録がありません';
+            }
+
+            // 車両基本情報＋車検証（最新情報）カード更新
+            const activeCar = carsList.find(c => c.id === targetCarId) || { name: 'マイカー1号', plate: '', model: '', chassis: '', firstReg: '' };
+            const carShakenList = shakenRecords.filter(s => (s.carId || 'default-car') === targetCarId);
+            const latest = carShakenList[0] || null;
+
+            document.getElementById('latestShakenCarName').textContent = activeCar.name || 'マイカー1号';
+            document.getElementById('latestShakenPlate').textContent = activeCar.plate || (latest && latest.plate) || '未登録';
+            document.getElementById('latestShakenModel').textContent = activeCar.model || (latest && latest.model) || '-';
+            document.getElementById('latestShakenFirstReg').textContent = activeCar.firstReg || (latest && latest.firstReg) || '-';
+            document.getElementById('latestShakenChassis').textContent = activeCar.chassis || (latest && latest.chassis) || '-';
+
+            document.getElementById('shakenHistoryCount').textContent = String(carShakenList.length);
+            const actionBtnText = document.getElementById('shakenActionBtnText');
+            const emptyState = document.getElementById('shakenEmptyState');
+            const latestCard = document.getElementById('shakenLatestCard');
+
+            if (latest) {
+                if (actionBtnText) actionBtnText.textContent = '車検証を更新';
+                emptyState.classList.add('hidden');
+                latestCard.classList.remove('hidden');
+
+                document.getElementById('latestShakenExpiry').textContent = latest.expiryDate || '----/--/--';
+                document.getElementById('latestShakenMemo').textContent = `メモ: ${latest.memo || 'なし'}`;
+                document.getElementById('latestShakenUpdated').textContent = `交付日: ${latest.issueDate || '----/--/--'}`;
+
+                const countdownEl = document.getElementById('latestShakenCountdown');
+                const daysLeft = -calcDaysDiffFromToday(latest.expiryDate);
+                if (daysLeft < 0) {
+                    countdownEl.textContent = `期限切れ (${Math.abs(daysLeft)}日超過)`;
+                    countdownEl.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700';
+                } else if (daysLeft <= 60) {
+                    countdownEl.textContent = `残り${daysLeft}日（更新時期）`;
+                    countdownEl.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800';
+                } else {
+                    countdownEl.textContent = `残り${daysLeft}日`;
+                    countdownEl.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+                }
+            } else {
+                if (actionBtnText) actionBtnText.textContent = '車検証を登録';
+                emptyState.classList.remove('hidden');
+                latestCard.classList.add('hidden');
+            }
+        }
+
+        function calcDaysDiffFromToday(dateStr) {
+            if (!dateStr) return 0;
+            const target = new Date(dateStr + 'T00:00:00');
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            return Math.floor((today - target) / (1000 * 60 * 60 * 24));
+        }
+
+        function triggerOilReminderNotification(nextDateStr, daysUntilNext) {
+            if (!notifEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (localStorage.getItem(STORAGE_KEY_LAST_NOTIFIED_DATE) === todayStr) return;
+
+            localStorage.setItem(STORAGE_KEY_LAST_NOTIFIED_DATE, todayStr);
+            new Notification('CarLog オイル交換リマインダー', {
+                body: daysUntilNext < 0
+                    ? `オイル交換目安日（${nextDateStr}）を${Math.abs(daysUntilNext)}日過ぎています。`
+                    : `オイル交換の目安日（${nextDateStr}）まであと${daysUntilNext}日です。`
+            });
+        }
+
+        // 車を追加モーダル操作（車両基本情報の登録）
+        function openAddCarModal() {
+            document.getElementById('addCarForm').reset();
+            const modal = document.getElementById('addCarModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeAddCarModal() {
+            const modal = document.getElementById('addCarModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function handleAddCarSubmit(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('addCarSubmitBtn');
+            const origHtml = submitBtn.innerHTML;
+
+            const name = document.getElementById('addCarName').value.trim();
+            const plate = document.getElementById('addCarPlate').value.trim();
+            const model = document.getElementById('addCarModel').value.trim();
+            const chassis = document.getElementById('addCarChassis').value.trim();
+            const firstReg = document.getElementById('addCarFirstReg').value;
+
+            if (!name || !plate) {
+                showToast('車両の呼び名とナンバーを入力してください', 'error');
+                return;
+            }
+
+            const newCar = {
+                id: 'car-' + Date.now(),
+                name: name,
+                plate: plate,
+                model: model,
+                chassis: chassis,
+                firstReg: firstReg
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>保存中...</span>';
+
+            try {
+                // 1. 即座にブラウザ内DBへ保存
+                carsMaster.push(newCar);
+                await persistAllLocalData();
+
+                selectedCarId = newCar.id;
+                localStorage.setItem(STORAGE_KEY_SELECTED_CAR, selectedCarId);
+
+                rebuildCarsList();
+                renderCarTabs();
+                renderDashboard();
+                renderRecords();
+                renderFuelRecords();
+                closeAddCarModal();
+
+                if (gasUrl) {
+                    showToast(`「${name}」を保存しました（スプレッドシートへ自動同期中）`, 'success');
+                    enqueueSyncOperation('add_car', { car: newCar });
+                } else {
+                    showToast(`「${name}」をブラウザに保存しました`, 'success');
+                }
+            } catch (err) {
+                console.error('Add car error:', err);
+                showToast('車の保存に失敗しました', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origHtml;
+            }
+        }
+
+        // 車検証モーダル操作（車検固有情報のみ）
+        function openShakenModal() {
+            const modal = document.getElementById('shakenModal');
+            const titleEl = document.getElementById('shakenModalTitle');
+            const targetCarInput = document.getElementById('shakenTargetCarId');
+            const carryOverNotice = document.getElementById('shakenCarryOverNotice');
+            const summaryEl = document.getElementById('shakenModalCarSummary');
+
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            const twoYearsLater = new Date(today.getFullYear() + 2, today.getMonth(), today.getDate());
+            const twoYearsLaterStr = twoYearsLater.toISOString().split('T')[0];
+
+            document.getElementById('shakenForm').reset();
+            document.getElementById('shakenIssueDate').value = todayStr;
+            document.getElementById('shakenExpiryDate').value = twoYearsLaterStr;
+
+            const activeCarId = getActiveCarIdForShaken();
+            targetCarInput.value = activeCarId;
+            const existing = shakenRecords.find(s => (s.carId || 'default-car') === activeCarId);
+            const carObj = carsList.find(c => c.id === activeCarId);
+
+            summaryEl.textContent = carObj
+                ? `${carObj.name}${carObj.plate ? '（' + carObj.plate + '）' : ''}`
+                : 'マイカー1号';
+
+            if (existing) {
+                titleEl.textContent = '車検証を更新する（2年更新）';
+                carryOverNotice.classList.remove('hidden');
+                if (existing.expiryDate) {
+                    const prevExp = new Date(existing.expiryDate + 'T00:00:00');
+                    prevExp.setFullYear(prevExp.getFullYear() + 2);
+                    document.getElementById('shakenExpiryDate').value = prevExp.toISOString().split('T')[0];
+                }
+            } else {
+                titleEl.textContent = '車検証情報を登録する';
+                carryOverNotice.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeShakenModal() {
+            const modal = document.getElementById('shakenModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function handleShakenSubmit(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('shakenSubmitBtn');
+            const origHtml = submitBtn.innerHTML;
+
+            const carId = document.getElementById('shakenTargetCarId').value || getActiveCarIdForShaken();
+            const carObj = carsList.find(c => c.id === carId) || { name: 'マイカー1号', plate: '', model: '', chassis: '', firstReg: '' };
+            const issueDate = document.getElementById('shakenIssueDate').value;
+            const expiryDate = document.getElementById('shakenExpiryDate').value;
+            const memo = document.getElementById('shakenMemo').value.trim();
+
+            if (!issueDate || !expiryDate) {
+                showToast('交付年月日と有効期間満了日を入力してください', 'error');
+                return;
+            }
+
+            const newShaken = {
+                id: 'shaken-' + Date.now(),
+                carId: carId,
+                carName: carObj.name || 'マイカー1号',
+                issueDate: issueDate,
+                expiryDate: expiryDate,
+                plate: carObj.plate || '',
+                model: carObj.model || '',
+                chassis: carObj.chassis || '',
+                firstReg: carObj.firstReg || '',
+                memo: memo
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>保存中...</span>';
+
+            try {
+                // 1. 即座にブラウザ内DBへ保存
+                shakenRecords.unshift(newShaken);
+                sortRecords();
+                await persistAllLocalData();
+
+                selectedCarId = carId;
+                localStorage.setItem(STORAGE_KEY_SELECTED_CAR, selectedCarId);
+
+                rebuildCarsList();
+                renderCarTabs();
+                renderDashboard();
+                renderRecords();
+                renderFuelRecords();
+                closeShakenModal();
+
+                if (gasUrl) {
+                    showToast('車検証情報を保存しました（スプレッドシートへ自動同期中）', 'success');
+                    enqueueSyncOperation('add_shaken', { record: newShaken });
+                } else {
+                    showToast('車検証情報をブラウザに保存しました', 'success');
+                }
+            } catch (err) {
+                console.error('Shaken save error:', err);
+                showToast('車検証情報の保存に失敗しました', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origHtml;
+            }
+        }
+
+        function openShakenHistoryModal() {
+            const targetCarId = getActiveCarIdForShaken();
+            const carObj = carsList.find(c => c.id === targetCarId);
+            const list = shakenRecords.filter(s => (s.carId || 'default-car') === targetCarId);
+
+            document.getElementById('shakenHistoryModalTitle').textContent =
+                `車検証更新履歴（${carObj ? carObj.name : '愛車'}）`;
+
+            const container = document.getElementById('shakenHistoryList');
+            if (list.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-slate-400">
+                        <p class="text-xs">この車両の車検証履歴はまだありません</p>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = list.map((item, idx) => `
+                    <div class="rounded-xl p-3.5 border ${idx === 0 ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-slate-50'} space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                ${idx === 0 ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-600 text-white">最新</span>' : '<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-600">過去履歴</span>'}
+                                <span class="font-bold text-slate-800 text-xs">満了日: ${escapeHtml(item.expiryDate)}</span>
+                            </div>
+                            <button type="button" onclick="requestDeleteShaken('${escapeHtml(item.id)}')" class="text-slate-400 hover:text-rose-600 p-1 text-xs" title="削除">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                        <div class="text-xs text-slate-700 font-semibold">${escapeHtml(item.plate)} ${item.model ? `/ ${escapeHtml(item.model)}` : ''}</div>
+                        <div class="text-[11px] text-slate-500 flex flex-wrap gap-x-3">
+                            <span>交付日: ${escapeHtml(item.issueDate)}</span>
+                            ${item.chassis ? `<span>車台番号: ${escapeHtml(item.chassis)}</span>` : ''}
+                        </div>
+                        ${item.memo ? `<p class="text-[11px] text-slate-500">${escapeHtml(item.memo)}</p>` : ''}
+                    </div>
+                `).join('');
+            }
+
+            const modal = document.getElementById('shakenHistoryModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeShakenHistoryModal() {
+            const modal = document.getElementById('shakenHistoryModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // 各種削除確認＆実行
+        function requestDeleteRecord(id) {
+            deleteTargetId = id;
+            deleteTargetType = 'maintenance';
+            document.getElementById('deleteModalTitle').textContent = 'このメンテナンス記録を削除しますか？';
+            document.getElementById('deleteModalDesc').textContent = '選択したメンテナンス記録を削除します。スプレッドシート連携中の場合、シートからも該当行が削除されます。';
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function requestDeleteShaken(id) {
+            deleteTargetId = id;
+            deleteTargetType = 'shaken';
+            document.getElementById('deleteModalTitle').textContent = 'この車検証記録を削除しますか？';
+            document.getElementById('deleteModalDesc').textContent = '選択した車検証の履歴を削除します。スプレッドシート連携中の場合、シートからも削除されます。';
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function requestDeleteCar() {
+            if (selectedCarId === 'ALL') return;
+            const carObj = carsList.find(c => c.id === selectedCarId);
+            deleteTargetId = selectedCarId;
+            deleteTargetType = 'car';
+            document.getElementById('deleteModalTitle').textContent = `「${carObj ? carObj.name : '選択中の車'}」を削除しますか？`;
+            document.getElementById('deleteModalDesc').textContent = 'この車両に登録されている車検証・メンテナンス・給油記録がすべて削除されます。この操作は取り消せません。';
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            deleteTargetId = null;
+        }
+
+        async function executeDelete() {
+            if (!deleteTargetId) return;
+            const btn = document.getElementById('confirmDeleteBtn');
+            const origText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '削除中...';
+
+            const targetId = deleteTargetId;
+            const targetType = deleteTargetType;
+
+            try {
+                if (targetType === 'maintenance') {
+                    records = records.filter(r => r.id !== targetId);
+                    await persistAllLocalData();
+                    enqueueSyncOperation('delete', { id: targetId });
+                } else if (targetType === 'shaken') {
+                    shakenRecords = shakenRecords.filter(s => s.id !== targetId);
+                    await persistAllLocalData();
+                    closeShakenHistoryModal();
+                    enqueueSyncOperation('delete_shaken', { id: targetId });
+                } else if (targetType === 'fuel') {
+                    fuelRecords = fuelRecords.filter(f => f.id !== targetId);
+                    await persistAllLocalData();
+                    enqueueSyncOperation('delete_fuel', { id: targetId });
+                } else if (targetType === 'car') {
+                    records = records.filter(r => (r.carId || 'default-car') !== targetId);
+                    shakenRecords = shakenRecords.filter(s => (s.carId || 'default-car') !== targetId);
+                    fuelRecords = fuelRecords.filter(f => (f.carId || 'default-car') !== targetId);
+                    carsMaster = carsMaster.filter(c => c.id !== targetId);
+                    await persistAllLocalData();
+                    enqueueSyncOperation('delete_car', { carId: targetId });
+                }
+
+                rebuildCarsList();
+                renderCarTabs();
+                renderDashboard();
+                renderRecords();
+                renderFuelRecords();
+                showToast(gasUrl ? '削除しました（スプレッドシートへ自動反映）' : '削除しました', 'info');
+            } catch (err) {
+                console.error('Delete error:', err);
+                showToast('削除に失敗しました', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = origText;
+                closeDeleteModal();
+            }
+        }
+
+        // ==========================================
+        // 5. メンテナンス記録 & 給油記録（燃費計算・アコーディオン）
+        // ==========================================
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            const origHtml = submitBtn.innerHTML;
+
+            const carId = document.getElementById('recordCarSelect').value || getActiveCarIdForShaken();
+            const carObj = carsList.find(c => c.id === carId);
+            const category = document.getElementById('categoryInput').value;
+            const date = document.getElementById('dateInput').value;
+            const mileageVal = document.getElementById('mileageInput').value;
+            const costVal = document.getElementById('costInput').value;
+            const memo = document.getElementById('memoInput').value.trim();
+
+            if (!date) {
+                showToast('実施日を入力してください', 'error');
+                return;
+            }
+
+            const newRecord = {
+                id: 'maint-' + Date.now(),
+                carId: carId,
+                carName: carObj ? carObj.name : 'マイカー1号',
+                date: date,
+                category: category,
+                mileage: mileageVal !== '' ? Number(mileageVal) : null,
+                cost: costVal !== '' ? Number(costVal) : null,
+                memo: memo
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>保存中...</span>';
+
+            try {
+                // 1. 即座にブラウザ内DBへ保存して画面反映
+                records.unshift(newRecord);
+                sortRecords();
+                await persistAllLocalData();
+
+                document.getElementById('mileageInput').value = '';
+                document.getElementById('costInput').value = '';
+                document.getElementById('memoInput').value = '';
+
+                rebuildCarsList();
+                renderCarTabs();
+                renderDashboard();
+                renderRecords();
+
+                // 2. GAS連携時は非同期送信キューへ追加
+                if (gasUrl) {
+                    showToast('一時保存しました（スプレッドシートへ自動同期中）', 'success');
+                    enqueueSyncOperation('add', { record: newRecord });
+                } else {
+                    showToast('ブラウザに記録しました', 'success');
+                }
+            } catch (err) {
+                console.error('Save error:', err);
+                showToast('記録の保存に失敗しました', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origHtml;
+            }
+        }
+
+        async function handleFuelFormSubmit(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('fuelSubmitBtn');
+            const origHtml = submitBtn.innerHTML;
+
+            const carId = document.getElementById('fuelCarSelect').value || getActiveCarIdForShaken();
+            const carObj = carsList.find(c => c.id === carId);
+            const category = document.getElementById('fuelCategoryInput').value;
+            const date = document.getElementById('fuelDateInput').value;
+            const mileageVal = document.getElementById('fuelMileageInput').value;
+            const amountVal = document.getElementById('fuelAmountInput').value;
+            const costVal = document.getElementById('fuelCostInput').value;
+            const memo = document.getElementById('fuelMemoInput').value.trim();
+
+            if (!date || costVal === '') {
+                showToast('給油日と金額を入力してください', 'error');
+                return;
+            }
+
+            const newFuel = {
+                id: 'fuel-' + Date.now(),
+                carId: carId,
+                carName: carObj ? carObj.name : 'マイカー1号',
+                date: date,
+                category: category,
+                mileage: mileageVal !== '' ? Number(mileageVal) : null,
+                amount: amountVal !== '' ? Number(amountVal) : null,
+                cost: Number(costVal),
+                memo: memo
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>保存中...</span>';
+
+            try {
+                // 1. 即座にブラウザ内DBへ保存して画面反映
+                fuelRecords.unshift(newFuel);
+                sortRecords();
+                await persistAllLocalData();
+
+                document.getElementById('fuelMileageInput').value = '';
+                document.getElementById('fuelAmountInput').value = '';
+                document.getElementById('fuelCostInput').value = '';
+                document.getElementById('fuelMemoInput').value = '';
+
+                rebuildCarsList();
+                renderCarTabs();
+                renderFuelRecords();
+
+                // 2. GAS連携時は非同期送信キューへ追加
+                if (gasUrl) {
+                    showToast('給油情報を一時保存しました（スプレッドシートへ自動同期中）', 'success');
+                    enqueueSyncOperation('add_fuel', { record: newFuel });
+                } else {
+                    showToast('給油情報をブラウザに記録しました', 'success');
+                }
+            } catch (err) {
+                console.error('Fuel save error:', err);
+                showToast('給油情報の保存に失敗しました', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origHtml;
+            }
+        }
+
+        function toggleFuelAccordion() {
+            const content = document.getElementById('fuelAccordionContent');
+            const toggleBtn = document.getElementById('fuelAccordionToggle');
+            const label = document.getElementById('fuelAccordionLabel');
+            const chevron = document.getElementById('fuelAccordionChevron');
+
+            const isHidden = content.classList.contains('hidden');
+            if (isHidden) {
+                content.classList.remove('hidden');
+                toggleBtn.setAttribute('aria-expanded', 'true');
+                label.textContent = '閉じる';
+                chevron.classList.add('rotate-180');
+            } else {
+                content.classList.add('hidden');
+                toggleBtn.setAttribute('aria-expanded', 'false');
+                label.textContent = '表示する';
+                chevron.classList.remove('rotate-180');
+            }
+        }
+
+        function renderFuelRecords() {
+            const listEl = document.getElementById('fuelRecordsList');
+            const countEl = document.getElementById('fuelRecordCount');
+            const badgeEl = document.getElementById('fuelSummaryBadge');
+            const avgEffEl = document.getElementById('avgFuelEfficiency');
+            const latestEffEl = document.getElementById('latestFuelEfficiency');
+            const costPerKmEl = document.getElementById('fuelCostPerKm');
+
+            // 車両ごとに時系列順（古い→新しい）で燃費(km/L)を事前計算
+            const efficiencyMap = new Map();
+            const firstMileageIds = new Set();
+            const byCar = new Map();
+            fuelRecords.forEach(item => {
+                const cid = item.carId || 'default-car';
+                if (!byCar.has(cid)) byCar.set(cid, []);
+                byCar.get(cid).push(item);
+            });
+
+            byCar.forEach(carList => {
+                const chronological = [...carList].sort((a, b) => {
+                    const cmp = (a.date || '').localeCompare(b.date || '');
+                    if (cmp !== 0) return cmp;
+                    if (a.mileage != null && b.mileage != null && a.mileage !== b.mileage) {
+                        return a.mileage - b.mileage;
+                    }
+                    return (a.id || '').localeCompare(b.id || '');
+                });
+
+                let prevMileage = null;
+                chronological.forEach(item => {
+                    if (item.mileage != null && !isNaN(item.mileage)) {
+                        if (prevMileage === null) {
+                            firstMileageIds.add(item.id);
+                        } else if (item.mileage > prevMileage && item.amount != null && item.amount > 0) {
+                            const tripKm = item.mileage - prevMileage;
+                            const kmPerL = tripKm / item.amount;
+                            const yenPerKm = item.cost > 0 ? (item.cost / tripKm) : null;
+                            efficiencyMap.set(item.id, {
+                                kmPerL: kmPerL.toFixed(1),
+                                kmPerLNum: kmPerL,
+                                tripKm: tripKm,
+                                amount: item.amount,
+                                cost: item.cost || 0,
+                                yenPerKm: yenPerKm !== null ? yenPerKm.toFixed(1) : null
+                            });
+                        }
+                        prevMileage = item.mileage;
+                    }
+                });
+            });
+
+            const filtered = selectedCarId === 'ALL'
+                ? [...fuelRecords]
+                : fuelRecords.filter(f => (f.carId || 'default-car') === selectedCarId);
+
+            countEl.textContent = `${filtered.length}件`;
+
+            const totalLiters = filtered.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
+            const totalCost = filtered.reduce((sum, f) => sum + (Number(f.cost) || 0), 0);
+
+            // 対象車両の燃費集計（区間走行距離合計 ÷ 給油量合計）
+            const effEntries = filtered.map(f => efficiencyMap.get(f.id)).filter(Boolean);
+            const latestWithEff = effEntries[0] || null;
+            let avgKmPerLStr = '--.- km/L';
+            let costPerKmStr = '--.- 円/km';
+
+            if (effEntries.length > 0) {
+                const sumTripKm = effEntries.reduce((s, e) => s + e.tripKm, 0);
+                const sumEffLiters = effEntries.reduce((s, e) => s + e.amount, 0);
+                const sumEffCost = effEntries.reduce((s, e) => s + e.cost, 0);
+                if (sumEffLiters > 0) {
+                    avgKmPerLStr = `${(sumTripKm / sumEffLiters).toFixed(1)} km/L`;
+                }
+                if (sumTripKm > 0 && sumEffCost > 0) {
+                    costPerKmStr = `${(sumEffCost / sumTripKm).toFixed(1)} 円/km`;
+                }
+            }
+
+            if (avgEffEl) avgEffEl.textContent = avgKmPerLStr;
+            if (latestEffEl) latestEffEl.textContent = latestWithEff ? `${latestWithEff.kmPerL} km/L` : '--.- km/L';
+            if (costPerKmEl) costPerKmEl.textContent = costPerKmStr;
+
+            const effText = latestWithEff ? ` / 直近 ${latestWithEff.kmPerL}km/L` : '';
+            badgeEl.textContent = `累計: ${totalLiters.toFixed(1)}L / ${totalCost.toLocaleString()}円${effText}`;
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `
+                    <div class="bg-slate-50 rounded-xl p-5 text-center border border-dashed border-slate-200 text-slate-400">
+                        <p class="text-xs font-medium">給油履歴はまだありません</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(item => {
+                const eff = efficiencyMap.get(item.id);
+                const isFirstMileage = firstMileageIds.has(item.id);
+                const unitPrice = (item.amount && item.amount > 0 && item.cost > 0)
+                    ? Math.round(item.cost / item.amount)
+                    : null;
+
+                return `
+                    <div class="bg-slate-50 rounded-xl p-3 border border-slate-200/80 flex items-center justify-between gap-2.5">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center flex-wrap gap-1.5">
+                                <span class="text-xs font-bold text-slate-800">${escapeHtml(item.date)}</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">${escapeHtml(item.category)}</span>
+                                ${eff ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800"><i class="fa-solid fa-leaf mr-0.5"></i>${eff.kmPerL} km/L (+${eff.tripKm.toLocaleString()}km${eff.yenPerKm ? ` / ${eff.yenPerKm}円/km` : ''})</span>` : (isFirstMileage ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-600">基準距離（次回給油で燃費計算）</span>` : '')}
+                                ${selectedCarId === 'ALL' && item.carName ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600">${escapeHtml(item.carName)}</span>` : ''}
+                            </div>
+                            <div class="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-600 mt-1">
+                                ${item.amount !== null && item.amount !== undefined ? `<span><i class="fa-solid fa-gas-pump text-slate-400 mr-1"></i>${Number(item.amount).toFixed(2)} L</span>` : ''}
+                                <span class="font-semibold text-slate-800"><i class="fa-solid fa-yen-sign text-slate-400 mr-0.5"></i>${Number(item.cost).toLocaleString()} 円${unitPrice ? ` <span class="text-[11px] font-normal text-slate-400">(${unitPrice}円/L)</span>` : ''}</span>
+                                ${item.mileage !== null && item.mileage !== undefined ? `<span><i class="fa-solid fa-gauge-high text-slate-400 mr-1"></i>${Number(item.mileage).toLocaleString()} km</span>` : ''}
+                            </div>
+                            ${item.memo ? `<p class="text-[11px] text-slate-500 mt-1 break-words">${escapeHtml(item.memo)}</p>` : ''}
+                        </div>
+                        <button type="button" onclick="requestDeleteFuel('${escapeHtml(item.id)}')" title="削除" class="w-7 h-7 rounded-lg hover:bg-rose-100 text-slate-400 hover:text-rose-600 flex items-center justify-center shrink-0 transition">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function requestDeleteFuel(id) {
+            deleteTargetId = id;
+            deleteTargetType = 'fuel';
+            document.getElementById('deleteModalTitle').textContent = 'この給油記録を削除しますか？';
+            document.getElementById('deleteModalDesc').textContent = '選択した給油記録を削除します。スプレッドシート連携中の場合、シートからも該当行が削除されます。';
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function getCategoryBadgeStyle(category) {
+            switch (category) {
+                case 'オイル交換':
+                    return { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'fa-oil-can' };
+                case 'タイヤ交換':
+                    return { bg: 'bg-blue-100', text: 'text-blue-700', icon: 'fa-dharmachakra' };
+                case 'フィルター交換':
+                    return { bg: 'bg-purple-100', text: 'text-purple-700', icon: 'fa-filter' };
+                default:
+                    return { bg: 'bg-slate-100', text: 'text-slate-700', icon: 'fa-wrench' };
+            }
+        }
+
+        function renderRecords() {
+            const listEl = document.getElementById('recordsList');
+            const countEl = document.getElementById('recordCount');
+            const filterVal = document.getElementById('filterSelect')?.value || 'ALL';
+
+            const filtered = records.filter(r => {
+                const matchCar = selectedCarId === 'ALL' || (r.carId || 'default-car') === selectedCarId;
+                const matchCat = filterVal === 'ALL' || r.category === filterVal;
+                return matchCar && matchCat;
+            });
+
+            if (countEl) countEl.textContent = `${filtered.length}件`;
+            if (!listEl) return;
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `
+                    <div class="bg-white rounded-2xl p-8 text-center border border-dashed border-slate-300 text-slate-400">
+                        <i class="fa-solid fa-clipboard-list text-2xl mb-2"></i>
+                        <p class="text-xs font-medium">表示するメンテナンス記録がありません</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(item => {
+                const style = getCategoryBadgeStyle(item.category);
+                return `
+                    <div class="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/80 flex items-center justify-between gap-3 fade-in">
+                        <div class="flex items-start space-x-3 min-w-0 flex-1">
+                            <div class="w-10 h-10 rounded-xl ${style.bg} ${style.text} flex items-center justify-center shrink-0 mt-0.5">
+                                <i class="fa-solid ${style.icon}"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center flex-wrap gap-1.5">
+                                    <span class="text-xs font-bold text-slate-800">${escapeHtml(item.date)}</span>
+                                    <span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${style.bg} ${style.text}">${escapeHtml(item.category)}</span>
+                                    ${selectedCarId === 'ALL' && item.carName ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">${escapeHtml(item.carName)}</span>` : ''}
+                                </div>
+                                <div class="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-600 mt-1">
+                                    ${item.mileage !== null && item.mileage !== undefined ? `<span><i class="fa-solid fa-gauge-high text-slate-400 mr-1"></i>${Number(item.mileage).toLocaleString()} km</span>` : ''}
+                                    ${item.cost !== null && item.cost !== undefined ? `<span><i class="fa-solid fa-yen-sign text-slate-400 mr-0.5"></i>${Number(item.cost).toLocaleString()} 円</span>` : ''}
+                                </div>
+                                ${item.memo ? `<p class="text-xs text-slate-500 mt-1 break-words">${escapeHtml(item.memo)}</p>` : ''}
+                            </div>
+                        </div>
+                        <button type="button" onclick="requestDeleteRecord('${escapeHtml(item.id)}')" title="削除" class="w-8 h-8 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center shrink-0 transition">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==========================================
+        // 6. 設定モーダル・GAS連携・通知・ユーティリティ
+        // ==========================================
+        function openSettingsModal() {
+            document.getElementById('gasUrlInput').value = gasUrl;
+            document.getElementById('oilCycleSelect').value = String(oilCycleDays);
+            updateNotificationUI();
+            const modal = document.getElementById('settingsModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveGasUrl() {
+            const inputVal = document.getElementById('gasUrlInput').value.trim();
+            if (!inputVal) {
+                showToast('GASのウェブアプリURLを入力してください', 'error');
+                return;
+            }
+            if (!inputVal.startsWith('https://script.google.com/')) {
+                showToast('正しいGoogle Apps ScriptのURLを入力してください', 'error');
+                return;
+            }
+            gasUrl = inputVal;
+            localStorage.setItem(STORAGE_KEY_GAS_URL, gasUrl);
+            updateConnectionUI();
+            closeSettingsModal();
+            loadRecords(true);
+        }
+
+        function clearGasUrl() {
+            gasUrl = '';
+            localStorage.removeItem(STORAGE_KEY_GAS_URL);
+            document.getElementById('gasUrlInput').value = '';
+            updateConnectionUI();
+            showToast('スプレッドシート連携を解除し、ローカル保存に戻しました', 'info');
+            loadRecords(false);
+        }
+
+        function updateConnectionUI() {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            const manualSyncBtn = document.getElementById('manualSyncBtn');
+            const pendingBadge = document.getElementById('pendingSyncBadge');
+            const spinIcon = document.getElementById('syncSpinIcon');
+            const modalQueueStatus = document.getElementById('modalSyncQueueStatus');
+            const modalSyncNowBtn = document.getElementById('modalSyncNowBtn');
+
+            const pendingCount = syncQueue.length;
+            const online = navigator.onLine;
+
+            if (modalQueueStatus) {
+                modalQueueStatus.textContent = gasUrl
+                    ? (pendingCount > 0 ? `未同期データ: ${pendingCount}件（自動送信待機中）` : 'すべて同期済み')
+                    : '未連携（ブラウザ内のみ保存）';
+            }
+
+            if (!gasUrl) {
+                dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+                text.textContent = 'ローカル保存モード';
+                if (manualSyncBtn) manualSyncBtn.classList.add('hidden');
+                if (modalSyncNowBtn) modalSyncNowBtn.classList.add('hidden');
+                return;
+            }
+
+            if (manualSyncBtn) {
+                manualSyncBtn.classList.remove('hidden');
+                manualSyncBtn.classList.add('flex');
+            }
+            if (modalSyncNowBtn) modalSyncNowBtn.classList.remove('hidden');
+
+            if (pendingBadge) {
+                if (pendingCount > 0) {
+                    pendingBadge.textContent = String(pendingCount);
+                    pendingBadge.classList.remove('hidden');
+                } else {
+                    pendingBadge.classList.add('hidden');
+                }
+            }
+
+            if (spinIcon) {
+                if (isSyncing) {
+                    spinIcon.className = 'fa-solid fa-arrows-rotate fa-spin text-blue-400';
+                } else if (pendingCount > 0) {
+                    spinIcon.className = 'fa-solid fa-cloud-arrow-up text-amber-400';
+                } else {
+                    spinIcon.className = 'fa-solid fa-cloud-check text-emerald-400';
+                }
+            }
+
+            if (isSyncing) {
+                dot.className = 'w-2 h-2 rounded-full bg-blue-400 animate-ping';
+                text.textContent = `同期中 (${pendingCount}件)`;
+            } else if (!online) {
+                dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+                text.textContent = pendingCount > 0 ? `オフライン (未同期${pendingCount}件)` : 'オフライン待機';
+            } else if (pendingCount > 0) {
+                dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+                text.textContent = `未同期 ${pendingCount}件`;
+            } else {
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+                text.textContent = 'シート同期済み';
+            }
+        }
+
+        function copyGasCode() {
+            const textarea = document.createElement('textarea');
+            textarea.value = GAS_SOURCE_CODE;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                const btn = document.getElementById('copyCodeBtn');
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i><span>コピー完了！</span>';
+                showToast('GASコードをクリップボードにコピーしました', 'success');
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            } catch (err) {
+                showToast('コピーに失敗しました。手動で選択してコピーしてください', 'error');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function saveNotificationSettings() {
+            oilCycleDays = Number(document.getElementById('oilCycleSelect').value) || 180;
+            localStorage.setItem(STORAGE_KEY_OIL_CYCLE, String(oilCycleDays));
+            renderDashboard();
+            showToast(`オイル交換サイクルを${oilCycleDays}日に設定しました`, 'info');
+        }
+
+        async function enableBrowserNotification() {
+            if (!('Notification' in window)) {
+                showToast('このブラウザはプッシュ通知に対応していません', 'error');
+                return;
+            }
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                notifEnabled = true;
+                localStorage.setItem(STORAGE_KEY_NOTIF_ENABLED, 'true');
+                updateNotificationUI();
+                showToast('オイル交換リマインダー通知を有効にしました！', 'success');
+                new Notification('CarLog 通知設定完了', {
+                    body: 'オイル交換目安の1ヶ月前になるとお知らせします。'
+                });
+            } else {
+                notifEnabled = false;
+                localStorage.setItem(STORAGE_KEY_NOTIF_ENABLED, 'false');
+                updateNotificationUI();
+                showToast('通知がブロックされています。ブラウザの設定から許可してください。', 'error');
+            }
+        }
+
+        function updateNotificationUI() {
+            const badge = document.getElementById('notifStatusBadge');
+            const btn = document.getElementById('enableNotifBtn');
+            if (!badge || !btn) return;
+
+            const isGranted = ('Notification' in window) && Notification.permission === 'granted' && notifEnabled;
+            if (isGranted) {
+                badge.textContent = '通知ON';
+                badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+                btn.innerHTML = '<i class="fa-solid fa-check"></i><span>通知は有効です</span>';
+                btn.className = 'w-full py-2 px-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-xs flex items-center justify-center space-x-1.5';
+            } else {
+                badge.textContent = '通知OFF';
+                badge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600';
+                btn.innerHTML = '<i class="fa-solid fa-bell"></i><span>スマホ・PC通知を許可する</span>';
+                btn.className = 'w-full py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center space-x-1.5';
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-rose-600' : 'bg-slate-800');
+            const iconClass = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info');
+
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-xl shadow-lg text-xs font-semibold flex items-center space-x-2 max-w-xs fade-in pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${iconClass} text-sm shrink-0"></i><span>${escapeHtml(message)}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
