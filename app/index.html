@@ -95,6 +95,10 @@
                 <!-- JSで車両タブを動的描画 -->
             </div>
             <div class="flex items-center space-x-1.5 shrink-0">
+                <button type="button" id="editCarBtn" onclick="openEditCarModal()" title="選択中の車を編集" class="hidden px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs transition items-center space-x-1">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span class="hidden sm:inline">編集</span>
+                </button>
                 <button type="button" id="deleteCarBtn" onclick="requestDeleteCar()" title="選択中の車を削除" class="hidden px-2.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs transition items-center space-x-1">
                     <i class="fa-solid fa-trash-can"></i>
                     <span class="hidden sm:inline">削除</span>
@@ -573,7 +577,7 @@
             <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
                 <div class="flex items-center space-x-2">
                     <i class="fa-solid fa-car text-blue-600 text-lg"></i>
-                    <h3 class="font-bold text-slate-800">新しい車を追加（車両基本情報）</h3>
+                    <h3 id="carModalTitle" class="font-bold text-slate-800">新しい車を追加（車両基本情報）</h3>
                 </div>
                 <button type="button" onclick="closeAddCarModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200/70 flex items-center justify-center text-slate-500 transition">
                     <i class="fa-solid fa-xmark"></i>
@@ -581,7 +585,8 @@
             </div>
 
             <form id="addCarForm" class="p-5 overflow-y-auto space-y-4 text-sm">
-                <p class="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                <input type="hidden" id="editCarId" value="">
+                <p id="carModalDesc" class="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
                     車両の基本情報（呼び名・ナンバー・型式など）を登録します。車検の満了日は追加後に「車検証を登録」から入力できます。
                 </p>
 
@@ -914,6 +919,49 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (payload.action === 'update_car') {
+    const sheet = getOrCreateCarsSheet();
+    const c = payload.car;
+    const data = sheet.getDataRange().getValues();
+    let updated = false;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(c.id)) {
+        sheet.getRange(i + 1, 2, 1, 6).setValues([[
+          c.name, c.plate || '', c.model || '', c.chassis || '', c.firstReg || '', new Date()
+        ]]);
+        updated = true;
+        break;
+      }
+    }
+    if (!updated) {
+      sheet.appendRow([
+        c.id, c.name, c.plate || '', c.model || '', c.chassis || '', c.firstReg || '', new Date()
+      ]);
+    }
+    const maintSheet = getOrCreateSheet();
+    const maintData = maintSheet.getDataRange().getValues();
+    for (let i = 1; i < maintData.length; i++) {
+      if (String(maintData[i][7] || 'default-car') === String(c.id)) {
+        maintSheet.getRange(i + 1, 9).setValue(c.name);
+      }
+    }
+    const shakenSheet = getOrCreateShakenSheet();
+    const shakenData = shakenSheet.getDataRange().getValues();
+    for (let i = 1; i < shakenData.length; i++) {
+      if (String(shakenData[i][9] || 'default-car') === String(c.id)) {
+        shakenSheet.getRange(i + 1, 11).setValue(c.name);
+      }
+    }
+    const fuelSheet = getOrCreateFuelSheet();
+    const fuelData = fuelSheet.getDataRange().getValues();
+    for (let i = 1; i < fuelData.length; i++) {
+      if (String(fuelData[i][7] || 'default-car') === String(c.id)) {
+        fuelSheet.getRange(i + 1, 9).setValue(c.name);
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (payload.action === 'add_shaken') {
     const sheet = getOrCreateShakenSheet();
     const s = payload.record;
@@ -1164,13 +1212,35 @@ function doPost(e) {
                 }
             }
 
+            if (action === 'update_car') {
+                const targetCar = payload.car;
+                const pendingAddCar = syncQueue.find(
+                    item => item.action === 'add_car' && item.payload?.car?.id === targetCar.id
+                );
+                if (pendingAddCar) {
+                    pendingAddCar.payload.car = targetCar;
+                    await dbSet('syncQueue', STORAGE_KEY_SYNC_QUEUE, syncQueue);
+                    updateConnectionUI();
+                    return;
+                }
+                const pendingUpdateCar = syncQueue.find(
+                    item => item.action === 'update_car' && item.payload?.car?.id === targetCar.id
+                );
+                if (pendingUpdateCar) {
+                    pendingUpdateCar.payload.car = targetCar;
+                    await dbSet('syncQueue', STORAGE_KEY_SYNC_QUEUE, syncQueue);
+                    updateConnectionUI();
+                    return;
+                }
+            }
+
             if (action === 'delete_car') {
                 const targetCarId = payload.carId;
                 const hadPendingCarAdd = syncQueue.some(
                     item => item.action === 'add_car' && item.payload?.car?.id === targetCarId
                 );
                 syncQueue = syncQueue.filter(item => {
-                    if (item.action === 'add_car' && item.payload?.car?.id === targetCarId) return false;
+                    if ((item.action === 'add_car' || item.action === 'update_car') && item.payload?.car?.id === targetCarId) return false;
                     if (item.payload?.record?.carId === targetCarId) return false;
                     return true;
                 });
@@ -1526,6 +1596,7 @@ function doPost(e) {
 
         function renderCarTabs() {
             const container = document.getElementById('carTabsContainer');
+            const editBtn = document.getElementById('editCarBtn');
             const deleteBtn = document.getElementById('deleteCarBtn');
             const maintCarSelect = document.getElementById('recordCarSelect');
             const fuelCarSelect = document.getElementById('fuelCarSelect');
@@ -1552,15 +1623,16 @@ function doPost(e) {
             });
             container.innerHTML = tabsHtml.join('');
 
-            if (deleteBtn) {
+            [editBtn, deleteBtn].forEach(btn => {
+                if (!btn) return;
                 if (selectedCarId !== 'ALL') {
-                    deleteBtn.classList.remove('hidden');
-                    deleteBtn.classList.add('flex');
+                    btn.classList.remove('hidden');
+                    btn.classList.add('flex');
                 } else {
-                    deleteBtn.classList.add('hidden');
-                    deleteBtn.classList.remove('flex');
+                    btn.classList.add('hidden');
+                    btn.classList.remove('flex');
                 }
-            }
+            });
 
             const optionsHtml = carsList.map(car =>
                 `<option value="${escapeHtml(car.id)}">${escapeHtml(car.name)}</option>`
@@ -1730,9 +1802,35 @@ function doPost(e) {
             });
         }
 
-        // 車を追加モーダル操作（車両基本情報の登録）
+        // 車を追加・編集モーダル操作（車両基本情報の登録・更新）
         function openAddCarModal() {
             document.getElementById('addCarForm').reset();
+            document.getElementById('editCarId').value = '';
+            document.getElementById('carModalTitle').textContent = '新しい車を追加（車両基本情報）';
+            document.getElementById('carModalDesc').textContent = '車両の基本情報（呼び名・ナンバー・型式など）を登録します。車検の満了日は追加後に「車検証を登録」から入力できます。';
+            document.getElementById('addCarSubmitBtn').innerHTML = '<i class="fa-solid fa-plus"></i><span>この車を追加する</span>';
+            const modal = document.getElementById('addCarModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function openEditCarModal() {
+            if (selectedCarId === 'ALL') return;
+            const carObj = carsList.find(c => c.id === selectedCarId);
+            if (!carObj) return;
+
+            document.getElementById('addCarForm').reset();
+            document.getElementById('editCarId').value = carObj.id;
+            document.getElementById('addCarName').value = carObj.name || '';
+            document.getElementById('addCarPlate').value = carObj.plate || '';
+            document.getElementById('addCarModel').value = carObj.model || '';
+            document.getElementById('addCarChassis').value = carObj.chassis || '';
+            document.getElementById('addCarFirstReg').value = carObj.firstReg || '';
+
+            document.getElementById('carModalTitle').textContent = '車両情報を編集';
+            document.getElementById('carModalDesc').textContent = '選択中の車両の基本情報（呼び名・ナンバー・型式など）を更新します。';
+            document.getElementById('addCarSubmitBtn').innerHTML = '<i class="fa-solid fa-check"></i><span>変更を保存する</span>';
+
             const modal = document.getElementById('addCarModal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -1749,6 +1847,7 @@ function doPost(e) {
             const submitBtn = document.getElementById('addCarSubmitBtn');
             const origHtml = submitBtn.innerHTML;
 
+            const editCarId = document.getElementById('editCarId').value.trim();
             const name = document.getElementById('addCarName').value.trim();
             const plate = document.getElementById('addCarPlate').value.trim();
             const model = document.getElementById('addCarModel').value.trim();
@@ -1760,8 +1859,9 @@ function doPost(e) {
                 return;
             }
 
-            const newCar = {
-                id: 'car-' + Date.now(),
+            const isEdit = Boolean(editCarId);
+            const carData = {
+                id: isEdit ? editCarId : ('car-' + Date.now()),
                 name: name,
                 plate: plate,
                 model: model,
@@ -1773,12 +1873,29 @@ function doPost(e) {
             submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>保存中...</span>';
 
             try {
-                // 1. 即座にブラウザ内DBへ保存
-                carsMaster.push(newCar);
-                await persistAllLocalData();
+                if (isEdit) {
+                    const existingIdx = carsMaster.findIndex(c => c.id === editCarId);
+                    if (existingIdx !== -1) {
+                        carsMaster[existingIdx] = carData;
+                    } else {
+                        carsMaster.push(carData);
+                    }
+                    // 既存の記録に紐づく車名も最新に揃える
+                    records.forEach(r => { if ((r.carId || 'default-car') === editCarId) r.carName = name; });
+                    shakenRecords.forEach(s => { if ((s.carId || 'default-car') === editCarId) s.carName = name; });
+                    fuelRecords.forEach(f => { if ((f.carId || 'default-car') === editCarId) f.carName = name; });
+                    await persistAllLocalData();
 
-                selectedCarId = newCar.id;
-                localStorage.setItem(STORAGE_KEY_SELECTED_CAR, selectedCarId);
+                    selectedCarId = editCarId;
+                    localStorage.setItem(STORAGE_KEY_SELECTED_CAR, selectedCarId);
+                } else {
+                    // 1. 即座にブラウザ内DBへ保存
+                    carsMaster.push(carData);
+                    await persistAllLocalData();
+
+                    selectedCarId = carData.id;
+                    localStorage.setItem(STORAGE_KEY_SELECTED_CAR, selectedCarId);
+                }
 
                 rebuildCarsList();
                 renderCarTabs();
@@ -1787,14 +1904,15 @@ function doPost(e) {
                 renderFuelRecords();
                 closeAddCarModal();
 
+                const syncAction = isEdit ? 'update_car' : 'add_car';
                 if (gasUrl) {
-                    showToast(`「${name}」を保存しました（スプレッドシートへ自動同期中）`, 'success');
-                    enqueueSyncOperation('add_car', { car: newCar });
+                    showToast(`「${name}」を${isEdit ? '更新' : '保存'}しました（スプレッドシートへ自動同期中）`, 'success');
+                    enqueueSyncOperation(syncAction, { car: carData });
                 } else {
-                    showToast(`「${name}」をブラウザに保存しました`, 'success');
+                    showToast(`「${name}」をブラウザに${isEdit ? '更新' : '保存'}しました`, 'success');
                 }
             } catch (err) {
-                console.error('Add car error:', err);
+                console.error(isEdit ? 'Update car error:' : 'Add car error:', err);
                 showToast('車の保存に失敗しました', 'error');
             } finally {
                 submitBtn.disabled = false;
