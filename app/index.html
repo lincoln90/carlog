@@ -1098,7 +1098,7 @@ function doPost(e) {
         let isSyncing = false;
 
         let carsList = [];
-        let selectedCarId = localStorage.getItem(STORAGE_KEY_SELECTED_CAR) || 'ALL';
+        let selectedCarId = localStorage.getItem(STORAGE_KEY_SELECTED_CAR) || '';
         let oilCycleDays = Number(localStorage.getItem(STORAGE_KEY_OIL_CYCLE)) || 180;
         let notifEnabled = localStorage.getItem(STORAGE_KEY_NOTIF_ENABLED) === 'true';
 
@@ -1635,12 +1635,9 @@ function doPost(e) {
 
             carsList = Array.from(map.values());
 
-            if (selectedCarId !== 'ALL' && !carsList.some(c => c.id === selectedCarId)) {
-                selectedCarId = carsList.length === 1 ? carsList[0].id : 'ALL';
+            if (!selectedCarId || selectedCarId === 'ALL' || !carsList.some(c => c.id === selectedCarId)) {
+                selectedCarId = carsList[0] ? carsList[0].id : 'default-car';
                 localStorage.setItem(STORAGE_KEY_SELECTED_CAR, selectedCarId);
-            }
-            if (carsList.length === 1 && selectedCarId === 'ALL') {
-                selectedCarId = carsList[0].id;
             }
         }
 
@@ -1668,15 +1665,6 @@ function doPost(e) {
             const fuelCarSelect = document.getElementById('fuelCarSelect');
 
             const tabsHtml = [];
-            if (carsList.length > 1) {
-                const isAll = selectedCarId === 'ALL';
-                tabsHtml.push(`
-                    <button type="button" onclick="selectCarTab('ALL')" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center space-x-1.5 ${isAll ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
-                        <i class="fa-solid fa-layer-group"></i>
-                        <span>すべての車 (${carsList.length})</span>
-                    </button>
-                `);
-            }
 
             carsList.forEach(car => {
                 const active = selectedCarId === car.id;
