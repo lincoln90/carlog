@@ -331,6 +331,44 @@
             </div>
 
             <form id="fuelForm" class="space-y-4">
+                <!-- レシートAI読み取り -->
+                <div class="bg-gradient-to-r from-rose-50/80 to-amber-50/70 border border-rose-200/80 rounded-xl p-3.5 space-y-2.5">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center text-xs shadow-xs">
+                                <i class="fa-solid fa-camera"></i>
+                            </span>
+                            <div>
+                                <p class="text-xs font-bold text-slate-800">レシートから自動入力（AI）</p>
+                                <p class="text-[10px] text-slate-500">撮影・画像選択で日付・給油量・金額・油種を読み取ります</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1.5">
+                            <button type="button" id="receiptScanBtn" onclick="triggerReceiptScan()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs shadow-xs transition flex items-center space-x-1.5">
+                                <i id="receiptScanIcon" class="fa-solid fa-camera"></i>
+                                <span id="receiptScanBtnLabel">レシートを撮影・選択</span>
+                            </button>
+                            <button type="button" id="receiptKeyGuideBtn" onclick="openSettingsModal()" title="Gemini APIキー設定" class="hidden px-2.5 py-2 rounded-xl border border-amber-300 bg-amber-100/80 hover:bg-amber-200/80 text-amber-800 font-bold text-[11px] transition flex items-center space-x-1">
+                                <i class="fa-solid fa-key"></i>
+                                <span>API設定</span>
+                            </button>
+                        </div>
+                    </div>
+                    <input type="file" id="receiptFileInput" accept="image/*" capture="environment" class="hidden">
+                    <div id="receiptPreviewArea" class="hidden items-center justify-between gap-2 bg-white/90 border border-rose-200/70 rounded-lg p-2">
+                        <div class="flex items-center space-x-2.5 min-w-0">
+                            <img id="receiptPreviewImg" src="" alt="レシートプレビュー" class="w-10 h-10 object-cover rounded-md border border-slate-200 shrink-0">
+                            <div class="min-w-0">
+                                <p id="receiptScanStatus" class="text-[11px] font-semibold text-slate-700 truncate">読み取り準備中...</p>
+                                <p class="text-[10px] text-slate-400">※読み取り後は内容をご確認のうえ記録してください</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="clearReceiptPreview()" title="プレビューを閉じる" class="w-6 h-6 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center shrink-0 transition">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-2">油種 <span class="text-rose-500">*</span></label>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="fuelCategoryButtons">
@@ -525,6 +563,34 @@
                         <strong>iPhone (Safari):</strong> 画面下の共有ボタン <i class="fa-solid fa-arrow-up-from-bracket text-slate-500"></i> → <strong>「ホーム画面に追加」</strong><br>
                         <strong>Android (Chrome):</strong> 右上メニュー <i class="fa-solid fa-ellipsis-vertical text-slate-500"></i> → <strong>「アプリをインストール」</strong>
                     </p>
+                </div>
+
+                <!-- レシート自動読み取り（Gemini API 無料枠） -->
+                <div class="bg-rose-50/70 border border-rose-200 rounded-xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label for="geminiApiKeyInput" class="font-bold text-slate-800 text-xs flex items-center space-x-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles text-rose-600"></i>
+                            <span>レシート自動読み取り（Gemini API 無料枠）</span>
+                        </label>
+                        <span id="geminiKeyStatusBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">未設定</span>
+                    </div>
+                    <div class="relative">
+                        <input type="password" id="geminiApiKeyInput" placeholder="AIzaSy...（Google AI StudioのAPIキー）" autocomplete="off" class="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs font-mono">
+                        <button type="button" onclick="toggleGeminiKeyVisibility()" title="表示/非表示を切り替え" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                            <i id="geminiKeyEyeIcon" class="fa-regular fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                    <p class="text-[11px] text-slate-500 leading-relaxed">
+                        キーはこの端末のブラウザ内（localStorage）にのみ保存され、画像解析時のみ Google Gemini API へ直接送信されます。
+                    </p>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <button type="button" onclick="clearGeminiApiKey()" class="text-xs text-slate-500 hover:text-rose-600 underline">
+                            APIキーを削除
+                        </button>
+                        <button type="button" onclick="saveGeminiApiKey()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition">
+                            APIキーを保存
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 現在のURL入力 -->
@@ -1084,12 +1150,14 @@ function doPost(e) {
         const STORAGE_KEY_OIL_CYCLE = 'carlog_oil_cycle_days';
         const STORAGE_KEY_NOTIF_ENABLED = 'carlog_notif_enabled';
         const STORAGE_KEY_LAST_NOTIFIED_DATE = 'carlog_last_notified_date';
+        const STORAGE_KEY_GEMINI_API_KEY = 'carlog_gemini_api_key';
 
         const IDB_NAME = 'CarLogOfflineDB';
         const IDB_VERSION = 1;
         let idbInstance = null;
 
         let gasUrl = localStorage.getItem(STORAGE_KEY_GAS_URL) || '';
+        let geminiApiKey = localStorage.getItem(STORAGE_KEY_GEMINI_API_KEY) || '';
         let records = [];
         let shakenRecords = [];
         let fuelRecords = [];
@@ -1408,10 +1476,12 @@ function doPost(e) {
 
             document.getElementById('maintenanceForm').addEventListener('submit', handleFormSubmit);
             document.getElementById('fuelForm').addEventListener('submit', handleFuelFormSubmit);
+            document.getElementById('receiptFileInput').addEventListener('change', handleReceiptFileChange);
             document.getElementById('addCarForm').addEventListener('submit', handleAddCarSubmit);
             document.getElementById('shakenForm').addEventListener('submit', handleShakenSubmit);
             document.getElementById('filterSelect').addEventListener('change', renderRecords);
             document.getElementById('confirmDeleteBtn').addEventListener('click', executeDelete);
+            updateReceiptScanUI();
 
             // オンライン復帰・画面復帰・定期バックグラウンド同期リスナー
             window.addEventListener('online', () => {
@@ -2340,6 +2410,7 @@ function doPost(e) {
                 document.getElementById('fuelAmountInput').value = '';
                 document.getElementById('fuelCostInput').value = '';
                 document.getElementById('fuelMemoInput').value = '';
+                clearReceiptPreview();
 
                 rebuildCarsList();
                 renderCarTabs();
@@ -2587,11 +2658,273 @@ function doPost(e) {
         // ==========================================
         function openSettingsModal() {
             document.getElementById('gasUrlInput').value = gasUrl;
+            document.getElementById('geminiApiKeyInput').value = geminiApiKey;
             document.getElementById('oilCycleSelect').value = String(oilCycleDays);
             updateNotificationUI();
+            updateReceiptScanUI();
             const modal = document.getElementById('settingsModal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+        }
+
+        function updateReceiptScanUI() {
+            const hasKey = Boolean(geminiApiKey);
+            const guideBtn = document.getElementById('receiptKeyGuideBtn');
+            const badge = document.getElementById('geminiKeyStatusBadge');
+            if (guideBtn) {
+                guideBtn.classList.toggle('hidden', hasKey);
+            }
+            if (badge) {
+                if (hasKey) {
+                    badge.textContent = '設定済み';
+                    badge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+                } else {
+                    badge.textContent = '未設定';
+                    badge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600';
+                }
+            }
+        }
+
+        function saveGeminiApiKey() {
+            const inputVal = document.getElementById('geminiApiKeyInput').value.trim();
+            if (!inputVal) {
+                showToast('Gemini APIキーを入力してください', 'error');
+                return;
+            }
+            geminiApiKey = inputVal;
+            localStorage.setItem(STORAGE_KEY_GEMINI_API_KEY, geminiApiKey);
+            updateReceiptScanUI();
+            showToast('Gemini APIキーを保存しました', 'success');
+        }
+
+        function clearGeminiApiKey() {
+            geminiApiKey = '';
+            localStorage.removeItem(STORAGE_KEY_GEMINI_API_KEY);
+            document.getElementById('geminiApiKeyInput').value = '';
+            updateReceiptScanUI();
+            showToast('Gemini APIキーを削除しました', 'info');
+        }
+
+        function toggleGeminiKeyVisibility() {
+            const input = document.getElementById('geminiApiKeyInput');
+            const icon = document.getElementById('geminiKeyEyeIcon');
+            if (!input || !icon) return;
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            icon.className = isPassword ? 'fa-regular fa-eye-slash text-xs' : 'fa-regular fa-eye text-xs';
+        }
+
+        function triggerReceiptScan() {
+            if (!geminiApiKey) {
+                showToast('先に設定画面でGemini APIキーを登録してください', 'error');
+                openSettingsModal();
+                return;
+            }
+            if (!navigator.onLine) {
+                showToast('オフラインのためレシート解析を利用できません', 'error');
+                return;
+            }
+            const fileInput = document.getElementById('receiptFileInput');
+            fileInput.value = '';
+            fileInput.click();
+        }
+
+        function clearReceiptPreview() {
+            const area = document.getElementById('receiptPreviewArea');
+            const img = document.getElementById('receiptPreviewImg');
+            const fileInput = document.getElementById('receiptFileInput');
+            if (area) {
+                area.classList.add('hidden');
+                area.classList.remove('flex');
+            }
+            if (img) img.src = '';
+            if (fileInput) fileInput.value = '';
+        }
+
+        function setFuelCategory(categoryName) {
+            const validCategories = ['レギュラー', 'ハイオク', '軽油', 'その他'];
+            const target = validCategories.includes(categoryName) ? categoryName : 'その他';
+            const buttons = document.querySelectorAll('.fuel-cat-btn');
+            const hiddenInput = document.getElementById('fuelCategoryInput');
+            buttons.forEach(b => {
+                if (b.dataset.value === target) {
+                    b.className = 'fuel-cat-btn active flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border-2 border-rose-600 bg-rose-50 text-rose-700 font-semibold text-sm transition';
+                } else {
+                    b.className = 'fuel-cat-btn flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-medium text-sm transition';
+                }
+            });
+            if (hiddenInput) hiddenInput.value = target;
+        }
+
+        function compressReceiptImage(file, maxSide = 1600, quality = 0.82) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onerror = () => reject(new Error('画像形式の解析に失敗しました'));
+                    img.onload = () => {
+                        let { width, height } = img;
+                        if (width > maxSide || height > maxSide) {
+                            if (width >= height) {
+                                height = Math.round((height * maxSide) / width);
+                                width = maxSide;
+                            } else {
+                                width = Math.round((width * maxSide) / height);
+                                height = maxSide;
+                            }
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                        const base64 = dataUrl.split(',')[1];
+                        resolve({ base64, dataUrl, mimeType: 'image/jpeg' });
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function callGeminiReceiptApi(base64Image, mimeType) {
+            const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+            const promptText = [
+                '日本のガソリンスタンドの給油レシート画像を解析し、以下のJSON形式のみで返答してください。',
+                '{"date": "YYYY-MM-DD または null", "amount": 数値(給油量L) または null, "cost": 整数(合計税込金額円) または null, "category": "レギュラー"|"ハイオク"|"軽油"|"その他"|null, "memo": "スタンド名や単価の簡潔なメモ(不明なら空文字)"}',
+                'ルール:',
+                '- 和暦（例: R8, 令和8年）や YY/MM/DD 表記は必ず西暦 YYYY-MM-DD に変換する。',
+                '- 給油量(L)は小数点を含めて正確に読み取る（例: 35.42）。',
+                '- 金額は税込の合計支払額（円）を整数で返す（カンマなし）。',
+                '- 油種は「レギュラー」「ハイオク」「軽油」「その他」から最も近いものを選ぶ（ハイオク/プレミアム→ハイオク、軽油/ディーゼル→軽油）。',
+                '- 読み取れない項目は無理に推測せず null にする。'
+            ].join('\n');
+
+            const requestBody = {
+                contents: [{
+                    parts: [
+                        { text: promptText },
+                        { inline_data: { mime_type: mimeType, data: base64Image } }
+                    ]
+                }],
+                generationConfig: {
+                    temperature: 0.1,
+                    responseMimeType: 'application/json'
+                }
+            };
+
+            let lastError = null;
+            for (const model of models) {
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiApiKey)}`;
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) {
+                        throw new Error('PARSE_ERROR');
+                    }
+                    return JSON.parse(jsonMatch[0]);
+                }
+
+                if (res.status === 404) {
+                    lastError = new Error(`MODEL_NOT_FOUND:${model}`);
+                    continue;
+                }
+                if (res.status === 400 || res.status === 401 || res.status === 403) {
+                    throw new Error('INVALID_KEY');
+                }
+                if (res.status === 429) {
+                    throw new Error('RATE_LIMIT');
+                }
+                throw new Error(`HTTP_${res.status}`);
+            }
+            throw lastError || new Error('API_ERROR');
+        }
+
+        async function handleReceiptFileChange(e) {
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            const btn = document.getElementById('receiptScanBtn');
+            const icon = document.getElementById('receiptScanIcon');
+            const label = document.getElementById('receiptScanBtnLabel');
+            const previewArea = document.getElementById('receiptPreviewArea');
+            const previewImg = document.getElementById('receiptPreviewImg');
+            const statusEl = document.getElementById('receiptScanStatus');
+
+            btn.disabled = true;
+            icon.className = 'fa-solid fa-circle-notch fa-spin';
+            label.textContent = '解析中...';
+            previewArea.classList.remove('hidden');
+            previewArea.classList.add('flex');
+            statusEl.textContent = '画像を圧縮してAIで読み取り中...';
+            statusEl.className = 'text-[11px] font-semibold text-slate-700 truncate';
+
+            try {
+                const { base64, dataUrl, mimeType } = await compressReceiptImage(file);
+                previewImg.src = dataUrl;
+
+                const parsed = await callGeminiReceiptApi(base64, mimeType);
+                const filled = [];
+
+                if (parsed.date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date)) {
+                    document.getElementById('fuelDateInput').value = parsed.date;
+                    filled.push('日付');
+                }
+                if (parsed.amount !== null && parsed.amount !== undefined && !Number.isNaN(Number(parsed.amount)) && Number(parsed.amount) > 0) {
+                    document.getElementById('fuelAmountInput').value = Number(parsed.amount);
+                    filled.push('給油量');
+                }
+                if (parsed.cost !== null && parsed.cost !== undefined && !Number.isNaN(Number(parsed.cost)) && Number(parsed.cost) >= 0) {
+                    document.getElementById('fuelCostInput').value = Math.round(Number(parsed.cost));
+                    filled.push('金額');
+                }
+                if (parsed.category) {
+                    setFuelCategory(parsed.category);
+                    filled.push('油種');
+                }
+                if (parsed.memo && typeof parsed.memo === 'string') {
+                    const memoInput = document.getElementById('fuelMemoInput');
+                    if (!memoInput.value.trim()) {
+                        memoInput.value = parsed.memo.trim();
+                    }
+                }
+
+                if (filled.length > 0) {
+                    statusEl.textContent = `自動入力完了（${filled.join('・')}）`;
+                    statusEl.className = 'text-[11px] font-semibold text-emerald-700 truncate';
+                    showToast('レシートを読み取りました。内容を確認して記録してください', 'success');
+                } else {
+                    statusEl.textContent = '項目を読み取れませんでした。手入力してください';
+                    statusEl.className = 'text-[11px] font-semibold text-amber-700 truncate';
+                    showToast('レシートから項目を読み取れませんでした。明るい場所で撮り直すか手入力してください', 'error');
+                }
+            } catch (err) {
+                console.error('Receipt scan error:', err);
+                let msg = 'レシートの読み取りに失敗しました';
+                if (err.message === 'INVALID_KEY') {
+                    msg = 'Gemini APIキーが無効です。設定画面で確認してください';
+                } else if (err.message === 'RATE_LIMIT') {
+                    msg = 'APIの無料枠レート制限に達しました。少し待ってから再度お試しください';
+                } else if (err.message === 'PARSE_ERROR') {
+                    msg = '読み取り結果の解析に失敗しました。撮り直すか手入力してください';
+                }
+                statusEl.textContent = msg;
+                statusEl.className = 'text-[11px] font-semibold text-rose-700 truncate';
+                showToast(msg, 'error');
+            } finally {
+                btn.disabled = false;
+                icon.className = 'fa-solid fa-camera';
+                label.textContent = 'レシートを撮影・選択';
+            }
         }
 
         function closeSettingsModal() {
