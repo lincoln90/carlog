@@ -1,4 +1,4 @@
-const CACHE_NAME = 'carlog-v2';
+const CACHE_NAME = 'carlog-v3';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -25,6 +25,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  if (event.request.cache === 'only-if-cached' && event.request.mode !== 'same-origin') return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
@@ -37,6 +38,22 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(async () => {
+        const cached = await caches.match(event.request, { ignoreSearch: true });
+        if (cached) return cached;
+
+        if (event.request.mode === 'navigate') {
+          const fallback =
+            (await caches.match('./index.html')) ||
+            (await caches.match('./'));
+          if (fallback) return fallback;
+        }
+
+        return new Response('Offline', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })
   );
 });
